@@ -2,8 +2,8 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Jiroskop Renk Eşleştirme Oyunu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>Jiroskop Yatay Renk Oyunu</title>
     <style>
         body {
             margin: 0;
@@ -14,53 +14,78 @@
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
-            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             height: 100vh;
             width: 100vw;
+            box-sizing: border-box;
         }
 
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        /* Tüm Ekranı ve Kareleri Çevreleyen Sınır */
+        #game-boundary {
+            position: relative;
+            width: 95vw;
+            height: 90vh;
+            border: 5px solid #34495e;
+            border-radius: 20px;
+            background-color: #222;
+            display: flex;
+            flex-direction: row; /* Sol ve Sağ düzeni */
+            align-items: center;
+            justify-content: space-around;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        /* Sol Bölüm: Skor ve Referans Kare Alanı */
+        #left-panel {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-between;
-            pointer-events: none;
+            justify-content: center;
+            gap: 20px;
+            width: 40%;
+            height: 100%;
             z-index: 2;
+            pointer-events: none;
         }
 
         #score-board {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
-            margin-top: 15px;
             background: rgba(255, 255, 255, 0.1);
             padding: 8px 16px;
-            border-radius: 20px;
-            pointer-events: auto;
+            border-radius: 15px;
         }
 
-        /* Seçenekler Alanı (Yarı yarıya küçültüldü) */
+        /* Sağ Bölüm: Seçenekler Alanı */
         #options-container {
             display: flex;
-            justify-content: space-around;
-            width: 100%;
-            max-width: 300px; /* Genişlik daraltıldı */
-            margin-bottom: 20px;
-            padding: 0 10px;
-            box-sizing: border-box;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            width: 55%;
+            height: 100%;
+            z-index: 2;
             pointer-events: auto;
-            transition: opacity 0.2s ease-in-out;
+            transition: opacity 0.3s ease;
         }
 
+        /* 2 saniyelik bekleme esnasında gizleme sınıfı */
+        .hidden-options {
+            opacity: 0.1;
+            pointer-events: none !important;
+        }
+
+        /* Seçenek Kartları (Yarı yarıya küçültüldü) */
         .option-card {
-            width: 24%; /* Kartlar küçültüldü */
-            aspect-ratio: 1;
+            width: 75px;
+            height: 75px;
             border: 3px solid #444;
-            border-radius: 6px;
+            border-radius: 8px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr;
@@ -69,15 +94,18 @@
             transition: border-color 0.2s;
         }
 
+        /* Arka Plandaki Canvas */
         canvas {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             z-index: 1;
+            pointer-events: none;
         }
 
+        /* Başlangıç Ekranı Overlayer */
         #start-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
@@ -107,35 +135,42 @@
 </head>
 <body>
 
-    <canvas id="gameCanvas"></canvas>
-
-    <div id="ui-layer">
-        <div id="score-board">Skor: <span id="score">0</span></div>
+    <div id="game-boundary">
         
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="left-panel">
+            <div id="score-board">Skor: <span id="score">0</span></div>
+            <div style="width: 180px; height: 180px;"></div> 
+        </div>
+
         <div id="options-container">
             <div class="option-card" id="opt0"></div>
             <div class="option-card" id="opt1"></div>
             <div class="option-card" id="opt2"></div>
         </div>
+
     </div>
 
     <div id="start-overlay">
-        <h2>Jiroskop Eşleştirme Oyunu</h2>
-        <p>Oyunu oynamak için telefonunuzu YATAY ve tepsi gibi düz tutun. Lütfen jiroskop izni verin.</p>
+        <h2>Jiroskop Yatay Renk Oyunu</h2>
+        <p>Lütfen telefonunuzu YATAY (Landscape) konuma getirin, tepsi gibi düz tutun ve oyunu başlatın.</p>
         <button id="start-btn">OYUNA BAŞLA</button>
     </div>
 
     <script>
+        const boundary = document.getElementById('game-boundary');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreEl = document.getElementById('score');
+        const optionsContainer = document.getElementById('options-container');
         const startOverlay = document.getElementById('start-overlay');
         const startBtn = document.getElementById('start-btn');
-        const optionsContainer = document.getElementById('options-container');
 
+        // Canvas boyutlarını sınır kutusuna göre eşitle
         function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            canvas.width = boundary.clientWidth;
+            canvas.height = boundary.clientHeight;
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
@@ -146,21 +181,17 @@
         let targetColors = [];
         let optionsData = [];
         let correctOptionIndex = 0;
-        let isWaitingNewRound = false;
+        let isWaitingForOptions = false; // 2 saniyelik bekleme kontrolü
 
-        // Üst Kare Sınır Tanımlamaları (180x180)
-        const size = 180;
-        let bounds = { startX: 0, startY: 80, endX: 0, endY: 260 };
-
-        // İmleç Fizikleri (Hız yarıya düşürüldü: 0.7 -> 0.35)
+        // İmleç Fizikleri (Hız yarıya düşürüldü)
         let cursor = {
             x: 0,
             y: 0,
-            radius: 8,
+            radius: 10,
             vx: 0,
             vy: 0,
-            speedMultiplier: 0.35, 
-            friction: 0.90        
+            speedMultiplier: 0.3, // 0.6'dan 0.3'e çekilerek hassasiyet azaltıldı
+            friction: 0.94        
         };
 
         let hoveredOptionIndex = -1;
@@ -188,20 +219,18 @@
             startOverlay.style.display = 'none';
             window.addEventListener('deviceorientation', handleOrientation);
             
-            // Dinamik sınırları ekran genişliğine göre merkezle
-            bounds.startX = (canvas.width - size) / 2;
-            bounds.endX = bounds.startX + size;
-            
-            cursor.x = bounds.startX + size / 2;
-            cursor.y = bounds.startY + size / 2;
+            // Başlangıçta imleci tam ortaya koy
+            cursor.x = canvas.width / 2;
+            cursor.y = canvas.height / 2;
 
-            generateNewRound(true);
+            generateNewRound(true); // İlk el seçenekler hemen gelsin
             requestAnimationFrame(gameLoop);
         }
 
-        // Yatay tutuş moduna göre jiroskop eksenleri
         function handleOrientation(event) {
-            let tiltX = event.beta;  
+            // Yatay modda telefon sola yatırıldığında beta X, gamma Y ekseni gibi davranır
+            // Cihazın dönüş yönüne göre yönleri optimize ediyoruz
+            let tiltX = event.beta; 
             let tiltY = -event.gamma; 
 
             cursor.vx += tiltX * cursor.speedMultiplier * 0.1;
@@ -216,7 +245,7 @@
             return roundColors;
         }
 
-        function generateNewRound(isFirstRound = false) {
+        function generateNewRound(immediateOptions = false) {
             targetColors = getRandomColors();
             correctOptionIndex = Math.floor(Math.random() * 3);
             optionsData = [];
@@ -233,6 +262,7 @@
                 }
             }
 
+            // Seçeneklerin DOM içeriklerini hazırla
             for (let i = 0; i < 3; i++) {
                 const card = document.getElementById(`opt${i}`);
                 card.innerHTML = '';
@@ -245,63 +275,57 @@
                 });
             }
 
-            cursor.x = bounds.startX + size / 2;
-            cursor.y = bounds.startY + size / 2;
-            cursor.vx = 0;
-            cursor.vy = 0;
             hoveredOptionIndex = -1;
             hoverStartTime = null;
 
-            if (!isFirstRound) {
+            if (immediateOptions) {
+                isWaitingForOptions = false;
+                optionsContainer.classList.remove('hidden-options');
+            } else {
                 // Seçenekleri gizle ve 2 saniye sonra göster
-                optionsContainer.style.opacity = '0';
-                optionsContainer.style.pointerEvents = 'none';
-                isWaitingNewRound = true;
-
+                isWaitingForOptions = true;
+                optionsContainer.classList.add('hidden-options');
                 setTimeout(() => {
-                    optionsContainer.style.opacity = '1';
-                    optionsContainer.style.pointerEvents = 'auto';
-                    isWaitingNewRound = false;
-                }, 2000);
+                    isWaitingForOptions = false;
+                    optionsContainer.classList.remove('hidden-options');
+                }, 2000); // 2 saniye gecikme
             }
         }
 
-        // Çarpışma Testi (Üst kare içi bölgelere göre seçim tespiti)
         function checkCollision() {
-            if (isWaitingNewRound) return;
+            if (isWaitingForOptions) return; // Seçenekler gizliyken algılama yapma
 
             let insideAnyZone = false;
-            let currentZone = -1;
+            // boundary kutusunun sol-üst köşesini referans alarak gerçek pozisyon hesaplama
+            const boundaryRect = boundary.getBoundingClientRect();
 
-            // İmlecin üst kare içindeki çeyrek dilim pozisyonuna göre seçenek eşleşmesi
-            let midX = bounds.startX + size / 2;
+            for (let i = 0; i < 3; i++) {
+                const card = document.getElementById(`opt${i}`);
+                const rect = card.getBoundingClientRect();
 
-            if (cursor.y >= bounds.startY && cursor.y <= bounds.endY) {
-                if (cursor.x >= bounds.startX && cursor.x < midX - 20) {
-                    currentZone = 0; // Sol Alan -> Seçenek 1
-                } else if (cursor.x >= midX - 20 && cursor.x <= midX + 20) {
-                    currentZone = 1; // Orta Alan -> Seçenek 2
-                } else if (cursor.x > midX + 20 && cursor.x <= bounds.endX) {
-                    currentZone = 2; // Sağ Alan -> Seçenek 3
-                }
-            }
+                // Kartın koordinatlarını canvas düzlemine indirgiyoruz
+                const relativeLeft = rect.left - boundaryRect.left;
+                const relativeRight = rect.right - boundaryRect.left;
+                const relativeTop = rect.top - boundaryRect.top;
+                const relativeBottom = rect.bottom - boundaryRect.top;
 
-            if (currentZone !== -1) {
-                insideAnyZone = true;
+                if (cursor.x >= relativeLeft && cursor.x <= relativeRight &&
+                    cursor.y >= relativeTop && cursor.y <= relativeBottom) {
+                    
+                    insideAnyZone = true;
 
-                if (hoveredOptionIndex !== currentZone) {
-                    if (hoveredOptionIndex !== -1) {
-                        document.getElementById(`opt${hoveredOptionIndex}`).style.borderColor = '#444';
+                    if (hoveredOptionIndex !== i) {
+                        hoveredOptionIndex = i;
+                        hoverStartTime = Date.now();
+                    } else {
+                        let elapsed = Date.now() - hoverStartTime;
+                        card.style.borderColor = '#f1c40f';
+
+                        if (elapsed >= requiredHoverTime) {
+                            processSelection(i);
+                        }
                     }
-                    hoveredOptionIndex = currentZone;
-                    hoverStartTime = Date.now();
-                } else {
-                    let elapsed = Date.now() - hoverStartTime;
-                    document.getElementById(`opt${currentZone}`).style.borderColor = '#f1c40f';
-
-                    if (elapsed >= requiredHoverTime) {
-                        processSelection(currentZone);
-                    }
+                    break;
                 }
             }
 
@@ -325,57 +349,61 @@
                 scoreEl.innerText = score;
             }
 
+            // Yeni tura geç ama seçenekleri geciktir
             setTimeout(() => {
-                generateNewRound();
+                generateNewRound(false);
             }, 300);
         }
 
         function gameLoop() {
-            bounds.startX = (canvas.width - size) / 2;
-            bounds.endX = bounds.startX + size;
-
             cursor.vx *= cursor.friction;
             cursor.vy *= cursor.friction;
             cursor.x += cursor.vx;
             cursor.y += cursor.vy;
 
-            // Kesin Sınır Algoritması: İmleç üst kare sınırlarının dışına çıkamaz
-            if (cursor.x - cursor.radius < bounds.startX) { cursor.x = bounds.startX + cursor.radius; cursor.vx = 0; }
-            if (cursor.x + cursor.radius > bounds.endX) { cursor.x = bounds.endX - cursor.radius; cursor.vx = 0; }
-            if (cursor.y - cursor.radius < bounds.startY) { cursor.y = bounds.startY + cursor.radius; cursor.vy = 0; }
-            if (cursor.y + cursor.radius > bounds.endY) { cursor.y = bounds.endY - cursor.radius; cursor.vy = 0; }
+            // KRİTİK GÜNCELLEME: İmleç artık kesinlikle dış sınırdan (canvas sınırından) dışarı çıkamaz
+            if (cursor.x - cursor.radius < 0) { cursor.x = cursor.radius; cursor.vx = 0; }
+            if (cursor.x + cursor.radius > canvas.width) { cursor.x = canvas.width - cursor.radius; cursor.vx = 0; }
+            if (cursor.y - cursor.radius < 0) { cursor.y = cursor.radius; cursor.vy = 0; }
+            if (cursor.y + cursor.radius > canvas.height) { cursor.y = canvas.height - cursor.radius; cursor.vy = 0; }
 
             checkCollision();
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Bütün 4 kareyi çevreleyen dış sınır çizgisi
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(bounds.startX, bounds.startY, size, size);
+            // Sol taraftaki panelin merkezine referans kareyi çiziyoruz
+            const size = 180;
+            const leftPanelEl = document.getElementById('left-panel');
+            const leftPanelRect = leftPanelEl.getBoundingClientRect();
+            const boundaryRect = boundary.getBoundingClientRect();
+
+            // Referans karenin x ve y'sini sol panel merkezine göre hesapla
+            const startX = (leftPanelRect.left - boundaryRect.left) + (leftPanelRect.width - size) / 2;
+            const startY = (leftPanelRect.top - boundaryRect.top) + (leftPanelRect.height - size) / 2 + 20;
 
             if (targetColors.length === 4) {
                 ctx.fillStyle = targetColors[0];
-                ctx.fillRect(bounds.startX, bounds.startY, size/2, size/2);
+                ctx.fillRect(startX, startY, size/2, size/2);
                 ctx.fillStyle = targetColors[1];
-                ctx.fillRect(bounds.startX + size/2, bounds.startY, size/2, size/2);
+                ctx.fillRect(startX + size/2, startY, size/2, size/2);
                 ctx.fillStyle = targetColors[2];
-                ctx.fillRect(bounds.startX, bounds.startY + size/2, size/2, size/2);
+                ctx.fillRect(startX, startY + size/2, size/2, size/2);
                 ctx.fillStyle = targetColors[3];
-                ctx.fillRect(bounds.startX + size/2, bounds.startY + size/2, size/2, size/2);
+                ctx.fillRect(startX + size/2, startY + size/2, size/2, size/2);
             }
 
+            // Ortadaki Artı Çizgisi
             ctx.strokeStyle = '#1a1a1a';
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(bounds.startX + size/2, bounds.startY);
-            ctx.lineTo(bounds.startX + size/2, bounds.startY + size);
-            ctx.moveTo(bounds.startX, bounds.startY + size/2);
-            ctx.lineTo(bounds.startX + size, bounds.startY + size/2);
+            ctx.moveTo(startX + size/2, startY);
+            ctx.lineTo(startX + size/2, startY + size);
+            ctx.moveTo(startX, startY + size/2);
+            ctx.lineTo(startX + size, startY + size/2);
             ctx.stroke();
 
-            // İmleç Çizimi
-            ctx.shadowBlur = 6;
+            // İmleci Çiz
+            ctx.shadowBlur = 10;
             ctx.shadowColor = '#ffffff';
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
@@ -383,15 +411,15 @@
             ctx.fill();
             ctx.shadowBlur = 0;
 
-            // Seçim İlerleme Halkası
-            if (hoveredOptionIndex !== -1 && hoverStartTime !== null && !isWaitingNewRound) {
+            // Hover Efekti (Halka)
+            if (hoveredOptionIndex !== -1 && hoverStartTime !== null && !isWaitingForOptions) {
                 let elapsed = Date.now() - hoverStartTime;
                 let angle = (elapsed / requiredHoverTime) * Math.PI * 2;
                 
                 ctx.strokeStyle = '#f1c40f';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.arc(cursor.x, cursor.y, cursor.radius + 5, -Math.PI/2, (-Math.PI/2) + angle);
+                ctx.arc(cursor.x, cursor.y, cursor.radius + 6, -Math.PI/2, (-Math.PI/2) + angle);
                 ctx.stroke();
             }
 
