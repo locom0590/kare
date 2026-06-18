@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, orientation=landscape">
-    <title>Jiroskop Yatay Renk Oyunu</title>
+    <title>Jiroskop Yatay Seviyeli Renk Oyunu</title>
     <style>
         body {
             margin: 0;
@@ -31,7 +31,7 @@
             border-radius: 20px;
             background-color: #222;
             display: flex;
-            flex-direction: row; /* Sol ve Sağ düzeni */
+            flex-direction: row;
             align-items: center;
             justify-content: space-around;
             padding: 20px;
@@ -46,7 +46,7 @@
             align-items: center;
             justify-content: center;
             gap: 20px;
-            width: 40%;
+            width: 35%;
             height: 100%;
             z-index: 2;
             pointer-events: none;
@@ -60,27 +60,27 @@
             border-radius: 15px;
         }
 
-        /* Sağ Bölüm: Seçenekler Alanı */
+        /* Sağ Bölüm: Seçenekler Alanı (Köşe Düzeni İçin Grid Yapıldı) */
         #options-container {
-            display: flex;
-            flex-direction: row;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Sol ve Sağ sütunlar */
+            grid-template-rows: 1fr 1fr;    /* Üst ve Alt satırlar */
+            gap: 40px;
+            justify-items: center;
             align-items: center;
-            gap: 20px;
-            width: 55%;
-            height: 100%;
+            width: 60%;
+            height: 80%;
             z-index: 2;
             pointer-events: auto;
             transition: opacity 0.3s ease;
         }
 
-        /* 2 saniyelik bekleme esnasında gizleme sınıfı */
         .hidden-options {
             opacity: 0.1;
             pointer-events: none !important;
         }
 
-        /* Seçenek Kartları (Yarı yarıya küçültüldü) */
+        /* Seçenek Kartları (75x75 boyutu korundu) */
         .option-card {
             width: 75px;
             height: 75px;
@@ -92,6 +92,32 @@
             overflow: hidden;
             box-sizing: border-box;
             transition: border-color 0.2s;
+            position: relative;
+        }
+
+        /* Seçeneklerin içindeki siyah artı (+) çizgileri */
+        .option-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 50%;
+            width: 3px; height: 100%;
+            background-color: #1a1a1a;
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+        .option-card::after {
+            content: "";
+            position: absolute;
+            top: 50%; left: 0;
+            width: 100%; height: 3px;
+            background-color: #1a1a1a;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+        .option-card div {
+            width: 100%;
+            height: 100%;
         }
 
         /* Arka Plandaki Canvas */
@@ -105,11 +131,11 @@
             pointer-events: none;
         }
 
-        /* Başlangıç Ekranı Overlayer */
+        /* Başlangıç Ekranı ve Seviye Seçimi */
         #start-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -120,23 +146,31 @@
             box-sizing: border-box;
         }
 
-        #start-btn {
-            padding: 15px 40px;
-            font-size: 20px;
+        .level-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .lvl-btn {
+            padding: 12px 30px;
+            font-size: 18px;
             font-weight: bold;
-            background-color: #2ecc71;
             color: white;
             border: none;
-            border-radius: 30px;
+            border-radius: 10px;
             cursor: pointer;
-            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4);
+            transition: transform 0.1s;
         }
+        .lvl-btn:active { transform: scale(0.95); }
+        #lvl1 { background-color: #2ecc71; box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3); }
+        #lvl2 { background-color: #f1c40f; box-shadow: 0 4px 10px rgba(241, 196, 15, 0.3); color: #222; }
+        #lvl4 { background-color: #e74c3c; box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3); }
     </style>
 </head>
 <body>
 
     <div id="game-boundary">
-        
         <canvas id="gameCanvas"></canvas>
 
         <div id="left-panel">
@@ -145,17 +179,17 @@
         </div>
 
         <div id="options-container">
-            <div class="option-card" id="opt0"></div>
-            <div class="option-card" id="opt1"></div>
-            <div class="option-card" id="opt2"></div>
-        </div>
-
+            <div class="option-card" id="opt0"></div> <div class="option-card" id="opt1"></div> <div class="option-card" id="opt2"></div> <div class="option-card" id="opt3"></div> </div>
     </div>
 
     <div id="start-overlay">
-        <h2>Jiroskop Yatay Renk Oyunu</h2>
-        <p>Lütfen telefonunuzu YATAY (Landscape) konuma getirin, tepsi gibi düz tutun ve oyunu başlatın.</p>
-        <button id="start-btn">OYUNA BAŞLA</button>
+        <h2>Jiroskop Köşe Eşleştirme Oyunu</h2>
+        <p>Telefonunuzu YATAY konuma getirip düz tutun ve oynamak istediğiniz seviyeyi seçin:</p>
+        <div class="level-buttons">
+            <button class="lvl-btn" id="lvl1">SEVİYE 1 (2 Renk)</button>
+            <button class="lvl-btn" id="lvl2">SEVİYE 2 (3 Renk)</button>
+            <button class="lvl-btn" id="lvl4">SEVİYE 4 (5 Renk)</button>
+        </div>
     </div>
 
     <script>
@@ -165,9 +199,7 @@
         const scoreEl = document.getElementById('score');
         const optionsContainer = document.getElementById('options-container');
         const startOverlay = document.getElementById('start-overlay');
-        const startBtn = document.getElementById('start-btn');
 
-        // Canvas boyutlarını sınır kutusuna göre eşitle
         function resizeCanvas() {
             canvas.width = boundary.clientWidth;
             canvas.height = boundary.clientHeight;
@@ -175,22 +207,19 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
 
-        const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0'];
+        // Tüm ana renk havuzu
+        const allColors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0', '#FFA500', '#800080'];
+        let activeColors = []; // Seçilen seviyeye göre filtrelenecek renkler
 
         let score = 0;
         let targetColors = [];
         let optionsData = [];
         let correctOptionIndex = 0;
-        let isWaitingForOptions = false; // 2 saniyelik bekleme kontrolü
+        let isWaitingForOptions = false;
 
-        // İmleç Fizikleri (Hız yarıya düşürüldü)
         let cursor = {
-            x: 0,
-            y: 0,
-            radius: 10,
-            vx: 0,
-            vy: 0,
-            speedMultiplier: 0.3, // 0.6'dan 0.3'e çekilerek hassasiyet azaltıldı
+            x: 0, y: 0, radius: 10, vx: 0, vy: 0,
+            speedMultiplier: 0.3, 
             friction: 0.94        
         };
 
@@ -198,7 +227,15 @@
         let hoverStartTime = null;
         const requiredHoverTime = 1000; 
 
-        startBtn.addEventListener('click', async () => {
+        // Seviye Buton Dinleyicileri
+        document.getElementById('lvl1').addEventListener('click', () => startWithLevel(2));
+        document.getElementById('lvl2').addEventListener('click', () => startWithLevel(3));
+        document.getElementById('lvl4').addEventListener('click', () => startWithLevel(5));
+
+        async function startWithLevel(colorCount) {
+            // Aktif renk havuzunu seviyeye göre kısıtla
+            activeColors = allColors.slice(0, colorCount);
+
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     const permissionState = await DeviceOrientationEvent.requestPermission();
@@ -213,23 +250,20 @@
             } else {
                 initGame();
             }
-        });
+        }
 
         function initGame() {
             startOverlay.style.display = 'none';
             window.addEventListener('deviceorientation', handleOrientation);
             
-            // Başlangıçta imleci tam ortaya koy
             cursor.x = canvas.width / 2;
             cursor.y = canvas.height / 2;
 
-            generateNewRound(true); // İlk el seçenekler hemen gelsin
+            generateNewRound(true); 
             requestAnimationFrame(gameLoop);
         }
 
         function handleOrientation(event) {
-            // Yatay modda telefon sola yatırıldığında beta X, gamma Y ekseni gibi davranır
-            // Cihazın dönüş yönüne göre yönleri optimize ediyoruz
             let tiltX = event.beta; 
             let tiltY = -event.gamma; 
 
@@ -240,17 +274,17 @@
         function getRandomColors() {
             let roundColors = [];
             for(let i=0; i<4; i++) {
-                roundColors.push(colors[Math.floor(Math.random() * colors.length)]);
+                roundColors.push(activeColors[Math.floor(Math.random() * activeColors.length)]);
             }
             return roundColors;
         }
 
         function generateNewRound(immediateOptions = false) {
             targetColors = getRandomColors();
-            correctOptionIndex = Math.floor(Math.random() * 3);
+            correctOptionIndex = Math.floor(Math.random() * 4); // Artık 4 seçenek var
             optionsData = [];
 
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 4; i++) {
                 if (i === correctOptionIndex) {
                     optionsData.push([...targetColors]);
                 } else {
@@ -262,8 +296,7 @@
                 }
             }
 
-            // Seçeneklerin DOM içeriklerini hazırla
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 4; i++) {
                 const card = document.getElementById(`opt${i}`);
                 card.innerHTML = '';
                 card.style.borderColor = '#444';
@@ -282,28 +315,25 @@
                 isWaitingForOptions = false;
                 optionsContainer.classList.remove('hidden-options');
             } else {
-                // Seçenekleri gizle ve 2 saniye sonra göster
                 isWaitingForOptions = true;
                 optionsContainer.classList.add('hidden-options');
                 setTimeout(() => {
                     isWaitingForOptions = false;
                     optionsContainer.classList.remove('hidden-options');
-                }, 2000); // 2 saniye gecikme
+                }, 2000); 
             }
         }
 
         function checkCollision() {
-            if (isWaitingForOptions) return; // Seçenekler gizliyken algılama yapma
+            if (isWaitingForOptions) return; 
 
             let insideAnyZone = false;
-            // boundary kutusunun sol-üst köşesini referans alarak gerçek pozisyon hesaplama
             const boundaryRect = boundary.getBoundingClientRect();
 
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 4; i++) {
                 const card = document.getElementById(`opt${i}`);
                 const rect = card.getBoundingClientRect();
 
-                // Kartın koordinatlarını canvas düzlemine indirgiyoruz
                 const relativeLeft = rect.left - boundaryRect.left;
                 const relativeRight = rect.right - boundaryRect.left;
                 const relativeTop = rect.top - boundaryRect.top;
@@ -349,7 +379,6 @@
                 scoreEl.innerText = score;
             }
 
-            // Yeni tura geç ama seçenekleri geciktir
             setTimeout(() => {
                 generateNewRound(false);
             }, 300);
@@ -361,7 +390,6 @@
             cursor.x += cursor.vx;
             cursor.y += cursor.vy;
 
-            // KRİTİK GÜNCELLEME: İmleç artık kesinlikle dış sınırdan (canvas sınırından) dışarı çıkamaz
             if (cursor.x - cursor.radius < 0) { cursor.x = cursor.radius; cursor.vx = 0; }
             if (cursor.x + cursor.radius > canvas.width) { cursor.x = canvas.width - cursor.radius; cursor.vx = 0; }
             if (cursor.y - cursor.radius < 0) { cursor.y = cursor.radius; cursor.vy = 0; }
@@ -371,13 +399,11 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Sol taraftaki panelin merkezine referans kareyi çiziyoruz
             const size = 180;
             const leftPanelEl = document.getElementById('left-panel');
             const leftPanelRect = leftPanelEl.getBoundingClientRect();
             const boundaryRect = boundary.getBoundingClientRect();
 
-            // Referans karenin x ve y'sini sol panel merkezine göre hesapla
             const startX = (leftPanelRect.left - boundaryRect.left) + (leftPanelRect.width - size) / 2;
             const startY = (leftPanelRect.top - boundaryRect.top) + (leftPanelRect.height - size) / 2 + 20;
 
@@ -392,7 +418,6 @@
                 ctx.fillRect(startX + size/2, startY + size/2, size/2, size/2);
             }
 
-            // Ortadaki Artı Çizgisi
             ctx.strokeStyle = '#1a1a1a';
             ctx.lineWidth = 4;
             ctx.beginPath();
