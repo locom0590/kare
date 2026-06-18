@@ -3,50 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VR Oyun - Adım 1: Görsel Tasarım</title>
+    <title>VR Oyun - Adım 2: Bakış Mekanizması</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 </head>
 <body>
 
     <a-scene>
         <a-entity camera look-controls position="0 1.6 0">
-            <a-cursor id="cursor" color="black"></a-cursor>
+            <a-cursor id="cursor" 
+                      color="black"
+                      raycaster="objects: .clickable"
+                      fuse="true" 
+                      fuse-timeout="1000"> </a-cursor>
         </a-entity>
 
         <a-entity id="reference-panel" position="0 2.5 -3" scale="0.8 0.8 0.8">
             <a-plane width="2.2" height="2.2" color="#222"></a-plane>
-            
-            <a-plane id="ref-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FF0000"></a-plane> <a-plane id="ref-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#00FF00"></a-plane> <a-plane id="ref-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FFFF00"></a-plane> <a-plane id="ref-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#0000FF"></a-plane> </a-entity>
+            <a-plane id="ref-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FF0000"></a-plane>
+            <a-plane id="ref-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#00FF00"></a-plane>
+            <a-plane id="ref-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FFFF00"></a-plane>
+            <a-plane id="ref-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#0000FF"></a-plane>
+        </a-entity>
 
-
-        <a-entity id="option-0" position="-1.8 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane width="2.2" height="2.2" color="#111"></a-plane>
+        <a-entity id="option-0" class="clickable" position="-1.8 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane id="bg-0" width="2.2" height="2.2" color="#111"></a-plane>
             <a-plane id="opt-0-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#00FF00"></a-plane>
             <a-plane id="opt-0-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#FF0000"></a-plane>
             <a-plane id="opt-0-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#0000FF"></a-plane>
             <a-plane id="opt-0-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#FFFF00"></a-plane>
         </a-entity>
 
-        <a-entity id="option-1" position="0 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane width="2.2" height="2.2" color="#111"></a-plane>
-            <a-plane id="opt-1-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FF0000"></a-entity>
+        <a-entity id="option-1" class="clickable" position="0 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane id="bg-1" width="2.2" height="2.2" color="#111"></a-plane>
+            <a-plane id="opt-1-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FF0000"></a-plane>
             <a-plane id="opt-1-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#00FF00"></a-plane>
             <a-plane id="opt-1-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FFFF00"></a-plane>
             <a-plane id="opt-1-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#0000FF"></a-plane>
         </a-entity>
 
-        <a-entity id="option-2" position="1.8 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane width="2.2" height="2.2" color="#111"></a-plane>
+        <a-entity id="option-2" class="clickable" position="1.8 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane id="bg-2" width="2.2" height="2.2" color="#111"></a-plane>
             <a-plane id="opt-2-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FFFF00"></a-plane>
             <a-plane id="opt-2-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#0000FF"></a-plane>
             <a-plane id="opt-2-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FF0000"></a-plane>
             <a-plane id="opt-2-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#00FF00"></a-plane>
         </a-entity>
 
-
         <a-sky color="#34495E"></a-sky>
         <a-plane position="0 0 0" rotation="-90 0 0" width="50" height="50" color="#2C3E50"></a-plane>
     </a-scene>
+
+    <script>
+        // Seçeneklere 1 saniye bakıldığında çalışacak JavaScript kodu
+        for (let i = 0; i < 3; i++) {
+            document.getElementById(`option-${i}`).addEventListener('click', function () {
+                // Algılamayı test etmek için arkadaki siyah fonu BEYAZ yapıyoruz
+                document.getElementById(`bg-${i}`).setAttribute('color', '#FFFFFF');
+            });
+        }
+    </script>
 
 </body>
 </html>
