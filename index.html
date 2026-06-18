@@ -3,59 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VR Oyun - Adım 2 (Kesin Çözüm)</title>
+    <title>VR Oyun - Adım 2: Jiroskop Entegrasyonu</title>
     <style>
-        /* Tüm ekranı kaplayan temel temizlik */
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #2C3E50; font-family: sans-serif; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #1a252f; font-family: sans-serif; }
 
-        /* Başlatma Ekranı */
+        /* Başlatma ve İzin Ekranı */
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #111; color: white; z-index: 9999;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
+            padding: 20px; text-align: center;
         }
         #start-btn {
             padding: 15px 30px; font-size: 18px; background: #27ae60;
-            color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 15px;
+            color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;
+            font-weight: bold;
         }
 
-        /* VR Box için Ekranı İkiye Bölme (Sol ve Sağ Göz) */
+        /* VR Çerçevesi */
         .vr-mode { display: flex; width: 100%; height: 100%; }
         .eye-screen {
             position: relative; width: 50%; height: 100%;
             border-right: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+
+        /* Kamera Kontteyneri: Jiroskop ile bu alanı döndüreceğiz */
+        .camera-world {
+            position: absolute; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: space-around; align-items: center;
             padding: 40px 0;
+            transform-origin: center center;
+            will-change: transform;
         }
 
-        /* VR Box Ortasındaki Bakış İmleci (Crosshair) */
+        /* VR Sabit İmleç (Ekrana yapışıktır, dünya dönse de tam ortada kalır) */
         .cursor {
             position: absolute; top: 50%; left: 50%;
-            width: 10px; height: 10px; background: white;
+            width: 12px; height: 12px; background: white;
             border-radius: 50%; transform: translate(-50%, -50%);
-            z-index: 100; pointer-events: none; box-shadow: 0 0 5px #000;
-            transition: transform 1s linear;
+            z-index: 100; pointer-events: none; box-shadow: 0 0 6px #000;
+            transition: transform 1s linear, background-color 0.2s;
         }
-        /* Bakarken küçülme efekti */
-        .cursor.fusing { transform: translate(-50%, -50%) scale(0.2); background: #ff3333; }
+        .cursor.fusing { transform: translate(-50%, -50%) scale(0.3); background: #e74c3c; }
 
-        /* Oyun Alanı Tasarımı (Karelerin Kutusu) */
+        /* Oyun Nesneleri */
         .matrix-container {
             display: grid; grid-template-columns: repeat(2, 1fr);
-            width: 140px; height: 140px; background: #222; padding: 5px; gap: 5px;
+            width: 130px; height: 130px; background: #222; padding: 5px; gap: 5px;
             border-radius: 8px; transition: background 0.3s;
         }
         .small-square { border-radius: 3px; }
-
-        /* Referans Kare (Yukarıdaki) */
         .reference-box { transform: scale(1.1); border: 3px solid #fff; }
+        
+        .options-group { display: flex; gap: 20px; justify-content: center; width: 100%; }
+        .option-box { transform: scale(0.85); }
 
-        /* Seçenekler Grubu (Aşağıdaki 3 adet) */
-        .options-group { display: flex; gap: 15px; justify-content: center; width: 100%; }
-        .option-box { transform: scale(0.8); cursor: pointer; }
-
-        /* Renk Tanımlamaları */
+        /* Renkler */
         .c-red { background: #FF0000; }
         .c-green { background: #00FF00; }
         .c-yellow { background: #FFFF00; }
@@ -65,61 +70,57 @@
 <body>
 
     <div id="start-screen">
-        <h2>VR Renk Oyunu - Adım 2</h2>
-        <p>Kareleri görmek ve oyunu başlatmak için tıklayın.</p>
-        <button id="start-btn">OYUNU BAŞLAT</button>
+        <h2>VR Hareket Testi</h2>
+        <p>Kafanızı çevirdiğinizde oyunun algılaması için hareket sensörü (jiroskop) izni vermeniz gerekmektedir.</p>
+        <button id="start-btn">İZİN VER VE BAŞLAT</button>
     </div>
 
     <div class="vr-mode">
         
-        <div class="eye-screen" id="left-eye">
+        <div class="eye-screen">
             <div class="cursor" id="cursor-left"></div>
-            
-            <div class="matrix-container reference-box">
-                <div class="small-square c-red"></div>
-                <div class="small-square c-green"></div>
-                <div class="small-square c-yellow"></div>
-                <div class="small-square c-blue"></div>
-            </div>
-
-            <div class="options-group">
-                <div class="matrix-container option-box" data-index="0">
-                    <div class="small-square c-green"></div><div class="small-square c-red"></div>
-                    <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
-                </div>
-                <div class="matrix-container option-box" data-index="1">
+            <div class="camera-world" id="world-left">
+                <div class="matrix-container reference-box">
                     <div class="small-square c-red"></div><div class="small-square c-green"></div>
                     <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
                 </div>
-                <div class="matrix-container option-box" data-index="2">
-                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                <div class="options-group">
+                    <div class="matrix-container option-box" data-index="0">
+                        <div class="small-square c-green"></div><div class="small-square c-red"></div>
+                        <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
+                    </div>
+                    <div class="matrix-container option-box" data-index="1">
+                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                    </div>
+                    <div class="matrix-container option-box" data-index="2">
+                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="eye-screen" id="right-eye">
+        <div class="eye-screen">
             <div class="cursor" id="cursor-right"></div>
-            
-            <div class="matrix-container reference-box">
-                <div class="small-square c-red"></div>
-                <div class="small-square c-green"></div>
-                <div class="small-square c-yellow"></div>
-                <div class="small-square c-blue"></div>
-            </div>
-
-            <div class="options-group">
-                <div class="matrix-container option-box" data-index="0">
-                    <div class="small-square c-green"></div><div class="small-square c-red"></div>
-                    <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
-                </div>
-                <div class="matrix-container option-box" data-index="1">
+            <div class="camera-world" id="world-right">
+                <div class="matrix-container reference-box">
                     <div class="small-square c-red"></div><div class="small-square c-green"></div>
                     <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
                 </div>
-                <div class="matrix-container option-box" data-index="2">
-                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                <div class="options-group">
+                    <div class="matrix-container option-box" data-index="0">
+                        <div class="small-square c-green"></div><div class="small-square c-red"></div>
+                        <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
+                    </div>
+                    <div class="matrix-container option-box" data-index="1">
+                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                    </div>
+                    <div class="matrix-container option-box" data-index="2">
+                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -128,50 +129,119 @@
 
     <script>
         let fuseTimer = null;
+        let isFusing = false;
+        let currentTargetIndex = null;
+        
         const leftCursor = document.getElementById('cursor-left');
         const rightCursor = document.getElementById('cursor-right');
+        const worldLeft = document.getElementById('world-left');
+        const worldRight = document.getElementById('world-right');
 
-        document.getElementById('start-btn').addEventListener('click', function() {
-            document.getElementById('start-screen').style.display = 'none';
-            // Telefon yatay çevrildiğinde tam ekran yapmak için (opsiyonel)
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen();
+        document.getElementById('start-btn').addEventListener('click', async function() {
+            // iOS için Jiroskop İzin İsteme Mekanizması
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        initVR();
+                    } else {
+                        alert('Jiroskop izni reddedildi. Oyun kafa hareketiyle oynanamaz.');
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
+            } else {
+                // Android veya izin istemeyen düz tarayıcılar direkt başlar
+                initVR();
             }
-            setupGazeEvents();
         });
 
-        function setupGazeEvents() {
-            // Aşağıdaki 3 seçeneği buluyoruz (Hem sol hem sağ gözdekileri eşzamanlı yöneteceğiz)
-            const optionBoxes = document.querySelectorAll('.option-box');
-
-            optionBoxes.forEach(box => {
-                // VR Box'ta kafayı çevirip imleci kutunun üzerine getirdiğimiz an (Mouseenter mobilde bakış simülasyonudur)
-                box.addEventListener('mouseenter', function() {
-                    const targetIndex = this.getAttribute('data-index');
-                    
-                    // İmleçlerin küçülme animasyonunu başlat (1 saniye sürecek)
-                    leftCursor.classList.add('fusing');
-                    rightCursor.classList.add('fusing');
-
-                    // 1 saniye (1000ms) boyunca odaklanılırsa seçimi gerçekleştir
-                    fuseTimer = setTimeout(() => {
-                        // Seçilen kutunun arka planını BEYAZ yap (Hem sol hem sağ ekranda)
-                        const identicalBoxes = document.querySelectorAll(`.option-box[data-index="${targetIndex}"]`);
-                        identicalBoxes.forEach(b => b.style.backgroundColor = '#FFFFFF');
-                        
-                        resetCursors();
-                    }, 1000);
-                });
-
-                // Kafayı kutudan başka yere çevirirse işlemi iptal et
-                box.addEventListener('mouseleave', function() {
-                    clearTimeout(fuseTimer);
-                    resetCursors();
-                });
-            });
+        function initVR() {
+            document.getElementById('start-screen').style.display = 'none';
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            
+            // Jiroskop Dinleyicisini Başlat
+            window.addEventListener('deviceorientation', handleOrientation, true);
+            
+            // Döngüsel olarak imlecin hangi kutunun üstünde olduğunu kontrol eden motor
+            setInterval(checkGazeCollision, 100);
         }
 
-        function resetCursors() {
+        // Kafayı sağa sola (gamma) veya yukarı aşağı (beta) oynattıkça dünyayı ters yöne kaydırırız
+        function handleOrientation(event) {
+            // Telefonun yatay tutulduğunu varsayıyoruz (VR Box modu)
+            // Cihaz eksenlerine göre kafa takibi simülasyonu
+            let xMove = 0;
+            let yMove = 0;
+
+            if (window.orientation === 90) {
+                xMove = -event.beta * 4;
+                yMove = -event.gamma * 4;
+            } else if (window.orientation === -90) {
+                xMove = event.beta * 4;
+                yMove = event.gamma * 4;
+            } else {
+                // Telefon dikse düzgün çalışması için yatay çevrilmesini isteyeceğiz ama şimdilik standart eşitleme:
+                xMove = event.gamma * 4;
+                yMove = event.beta * 4;
+            }
+
+            // Dünyayı (kareleri) hareket ettirerek kameranın döndüğü hissini yaratıyoruz
+            const transformStyle = `translate(${xMove}px, ${yMove}px)`;
+            worldLeft.style.transform = transformStyle;
+            worldRight.style.transform = transformStyle;
+        }
+
+        // İmleç tam ekranın ortasında sabit durduğu için, hangi kutunun ekranın ortasına denk geldiğini hesaplayan fonksiyon
+        function checkGazeCollision() {
+            // Sadece sol göz ekranı üzerinden kontrol etmemiz yeterli (iki göz de simetrik)
+            const optionBoxes = worldLeft.querySelectorAll('.option-box');
+            let hitDetected = false;
+
+            // Ekranın tam ortasının koordinatları (Sol gözün merkezi)
+            const centerX = window.innerWidth / 4;
+            const centerY = window.innerHeight / 2;
+
+            optionBoxes.forEach(box => {
+                const rect = box.getBoundingClientRect();
+                
+                // Eğer ekranın tam ortası bu kutunun sınırları içindeyse (Bakış isabet ettiyse)
+                if (centerX >= rect.left && centerX <= rect.right && centerY >= rect.top && centerY <= rect.bottom) {
+                    hitDetected = true;
+                    const index = box.getAttribute('data-index');
+
+                    if (!isFusing || currentTargetIndex !== index) {
+                        startFusing(index);
+                    }
+                }
+            });
+
+            // Eğer hiçbir kutuya bakılmıyorsa imleci sıfırla
+            if (!hitDetected && isFusing) {
+                cancelFusing();
+            }
+        }
+
+        function startFusing(index) {
+            isFusing = true;
+            currentTargetIndex = index;
+            leftCursor.classList.add('fusing');
+            rightCursor.classList.add('fusing');
+
+            // 1 saniye (1000ms) boyunca bakış sürerse tetikle
+            fuseTimer = setTimeout(() => {
+                const allMatches = document.querySelectorAll(`.option-box[data-index="${currentTargetIndex}"]`);
+                allMatches.forEach(b => b.style.backgroundColor = '#FFFFFF'); // İsabet eden kutuyu beyaza boya
+                cancelFusing();
+            }, 1000);
+        }
+
+        function cancelFusing() {
+            clearTimeout(fuseTimer);
+            isFusing = false;
+            currentTargetIndex = null;
             leftCursor.classList.remove('fusing');
             rightCursor.classList.remove('fusing');
         }
