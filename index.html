@@ -11,14 +11,26 @@
             background-color: #1a1a1a;
             color: white;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            position: relative;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            height: 100vh;
-            overflow: hidden;
-            user-select: none;
-            -webkit-user-select: none;
+            pointer-events: none; /* Tıklamaları engellemez, imleç arkadan akar */
+            z-index: 2;
         }
 
         #score-board {
@@ -28,15 +40,7 @@
             background: rgba(255, 255, 255, 0.1);
             padding: 10px 20px;
             border-radius: 20px;
-        }
-
-        /* Oyun Alanı (Canvas) */
-        canvas {
-            background-color: #222;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border-radius: 15px;
-            max-width: 90vw;
-            max-height: 50vh;
+            pointer-events: auto;
         }
 
         /* Seçenekler Alanı */
@@ -48,6 +52,7 @@
             margin-bottom: 30px;
             padding: 0 10px;
             box-sizing: border-box;
+            pointer-events: auto;
         }
 
         .option-card {
@@ -60,11 +65,20 @@
             grid-template-rows: 1fr 1fr;
             overflow: hidden;
             box-sizing: border-box;
-            transition: transform 0.2s, border-color 0.2s;
-            position: relative;
+            transition: border-color 0.2s;
         }
 
-        /* İzin ve Başlangıç Ekranı Overlayer */
+        /* Tüm Ekranı Kaplayan Canvas */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* İzin ve Başlangıç Ekranı */
         #start-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
@@ -94,14 +108,16 @@
 </head>
 <body>
 
-    <div id="score-board">Skor: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
 
-    <canvas id="gameCanvas" width="360" height="380"></canvas>
-
-    <div id="options-container">
-        <div class="option-card" id="opt0" data-index="0"></div>
-        <div class="option-card" id="opt1" data-index="1"></div>
-        <div class="option-card" id="opt2" data-index="2"></div>
+    <div id="ui-layer">
+        <div id="score-board">Skor: <span id="score">0</span></div>
+        
+        <div id="options-container">
+            <div class="option-card" id="opt0"></div>
+            <div class="option-card" id="opt1"></div>
+            <div class="option-card" id="opt2"></div>
+        </div>
     </div>
 
     <div id="start-overlay">
@@ -117,39 +133,40 @@
         const startOverlay = document.getElementById('start-overlay');
         const startBtn = document.getElementById('start-btn');
 
+        // Ekran boyutlarını ayarla
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
         // Renk Havuzu
         const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0'];
 
-        // Oyun Durumu (State)
+        // Oyun Durumu
         let score = 0;
-        let targetColors = []; // Üstteki karenin 4 rengi [sol-üst, sağ-üst, sol-alt, sağ-alt]
-        let optionsData = [];  // 3 seçeneğin renk kombinasyonları
+        let targetColors = [];
+        let optionsData = [];
         let correctOptionIndex = 0;
 
-        // İmleç (Cursor) Fizikleri
+        // İmleç Fizikleri
         let cursor = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
             radius: 12,
             vx: 0,
             vy: 0,
-            speedMultiplier: 0.6, // Jiroskop hassasiyeti
-            friction: 0.92        // Akıcılık (Sürtünme)
+            speedMultiplier: 0.7, 
+            friction: 0.92        
         };
 
-        // Zamanlayıcı Kontrolleri (1 saniye kalma mekaniği)
+        // Zamanlayıcı Kontrolleri
         let hoveredOptionIndex = -1;
         let hoverStartTime = null;
-        const requiredHoverTime = 1000; // 1 saniye (ms)
+        const requiredHoverTime = 1000; 
 
-        // Alt seçeneklerin Canvas üzerindeki sanal izdüşüm koordinatları
-        const optionZones = [
-            { id: 0, xStart: 10,  xEnd: 110, yStart: 260, yEnd: 370 },
-            { id: 1, xStart: 130, xEnd: 230, yStart: 260, yEnd: 370 },
-            { id: 2, xStart: 250, xEnd: 350, yStart: 260, yEnd: 370 }
-        ];
-
-        // 1. Oyunu Başlatma ve İzin İşlemleri
+        // İzin İşlemleri
         startBtn.addEventListener('click', async () => {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
@@ -157,7 +174,7 @@
                     if (permissionState === 'granted') {
                         initGame();
                     } else {
-                        alert('Jiroskop izni reddedildi. Oyun oynanamaz.');
+                        alert('Jiroskop izni reddedildi.');
                     }
                 } catch (error) {
                     console.error(error);
@@ -174,16 +191,14 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // 2. Jiroskop Verisini Yakalama
         function handleOrientation(event) {
             let tiltX = event.gamma; 
-            let tiltY = event.beta; // 45 derece kalibrasyonu kaldırılarak tepsi gibi düz tutuşa uyarlandı
+            let tiltY = event.beta; // Tam tepsi modu (0 kalibrasyon)
 
             cursor.vx += tiltX * cursor.speedMultiplier * 0.1;
             cursor.vy += tiltY * cursor.speedMultiplier * 0.1;
         }
 
-        // 3. Yeni Bölüm Oluşturma (Renk Kombinasyonları)
         function getRandomColors() {
             let roundColors = [];
             for(let i=0; i<4; i++) {
@@ -222,32 +237,36 @@
             }
 
             cursor.x = canvas.width / 2;
-            cursor.y = 100;
+            cursor.y = canvas.height / 2;
             cursor.vx = 0;
             cursor.vy = 0;
             hoveredOptionIndex = -1;
             hoverStartTime = null;
         }
 
-        // 4. Çarpışma Testi
+        // Çarpışma Testi (DOM Elemanlarının gerçek konumuna göre dinamik algılama)
         function checkCollision() {
             let insideAnyZone = false;
 
-            for (let zone of optionZones) {
-                if (cursor.x >= zone.xStart && cursor.x <= zone.xEnd &&
-                    cursor.y >= zone.yStart && cursor.y <= zone.yEnd) {
+            for (let i = 0; i < 3; i++) {
+                const card = document.getElementById(`opt${i}`);
+                const rect = card.getBoundingClientRect();
+
+                // İmleç HTML kartının sınırları içinde mi?
+                if (cursor.x >= rect.left && cursor.x <= rect.right &&
+                    cursor.y >= rect.top && cursor.y <= rect.bottom) {
                     
                     insideAnyZone = true;
 
-                    if (hoveredOptionIndex !== zone.id) {
-                        hoveredOptionIndex = zone.id;
+                    if (hoveredOptionIndex !== i) {
+                        hoveredOptionIndex = i;
                         hoverStartTime = Date.now();
                     } else {
                         let elapsed = Date.now() - hoverStartTime;
-                        document.getElementById(`opt${zone.id}`).style.borderColor = '#f1c40f';
+                        card.style.borderColor = '#f1c40f';
 
                         if (elapsed >= requiredHoverTime) {
-                            processSelection(zone.id);
+                            processSelection(i);
                         }
                     }
                     break;
@@ -263,7 +282,6 @@
             }
         }
 
-        // 5. Seçim Doğrulama Mantığı
         function processSelection(selectedIndex) {
             if (selectedIndex === correctOptionIndex) {
                 score++;
@@ -280,13 +298,14 @@
             }, 300);
         }
 
-        // 6. Ana Oyun Döngüsü
+        // Ana Döngü
         function gameLoop() {
             cursor.vx *= cursor.friction;
             cursor.vy *= cursor.friction;
             cursor.x += cursor.vx;
             cursor.y += cursor.vy;
 
+            // Sadece ekranın en dış sınırları korundu (Dışarı kaçmasın diye)
             if (cursor.x - cursor.radius < 0) { cursor.x = cursor.radius; cursor.vx = 0; }
             if (cursor.x + cursor.radius > canvas.width) { cursor.x = canvas.width - cursor.radius; cursor.vx = 0; }
             if (cursor.y - cursor.radius < 0) { cursor.y = cursor.radius; cursor.vy = 0; }
@@ -296,9 +315,10 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // Üstteki Büyük Kareyi Çiz
             const size = 180;
             const startX = (canvas.width - size) / 2;
-            const startY = 20;
+            const startY = 100; // Skor tabelasının altına hizalandı
 
             if (targetColors.length === 4) {
                 ctx.fillStyle = targetColors[0];
@@ -311,6 +331,7 @@
                 ctx.fillRect(startX + size/2, startY + size/2, size/2, size/2);
             }
 
+            // Ortadaki Artı Çizgisi
             ctx.strokeStyle = '#1a1a1a';
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -320,21 +341,16 @@
             ctx.lineTo(startX + size, startY + size/2);
             ctx.stroke();
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.lineWidth = 1;
-            optionZones.forEach(zone => {
-                ctx.strokeRect(zone.xStart, zone.yStart, zone.xEnd - zone.xStart, zone.yEnd - zone.yStart);
-            });
-
+            // İmleci Çiz
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#ffffff';
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.arc(cursor.x, cursor.y, cursor.radius, 0, Math.PI * 2);
             ctx.fill();
-            
             ctx.shadowBlur = 0;
 
+            // Hover Efekti (Halka)
             if (hoveredOptionIndex !== -1 && hoverStartTime !== null) {
                 let elapsed = Date.now() - hoverStartTime;
                 let angle = (elapsed / requiredHoverTime) * Math.PI * 2;
