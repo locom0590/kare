@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>VR Web Gaze Matching Game - Fixed</title>
+    <title>VR Gaze Game - Safari Calibrated</title>
     <style>
         * {
             box-sizing: border-box;
@@ -44,7 +44,7 @@
             box-shadow: 0 5px 15px rgba(0,250,0,0.3);
         }
 
-        /* Ana VR Düzeni */
+        /* VR Düzeni */
         #vr-container {
             display: flex;
             width: 100vw;
@@ -58,12 +58,11 @@
             overflow: hidden;
             background: #1a1a1a;
         }
-        /* Tam ortadaki dikey bölme çizgisi (VR Box kalibrasyonu için) */
         #left-eye {
             border-right: 2px solid #000;
         }
 
-        /* Sabit Crosshair (Hedef İmleci) */
+        /* Sabit Crosshair */
         .crosshair-container {
             position: absolute;
             top: 50%;
@@ -96,7 +95,7 @@
             border-color: #ffeb3b;
         }
 
-        /* Hareketli Dünya Sahnesi */
+        /* Hareketli Dünya */
         .scene {
             position: absolute;
             width: 100%;
@@ -142,7 +141,6 @@
             text-shadow: 2px 2px 4px #000;
         }
 
-        /* Seçenekler Alanı */
         .options-zone {
             display: flex;
             justify-content: center;
@@ -153,7 +151,6 @@
             position: relative;
         }
 
-        /* Başarı/Hata Katmanları */
         .feedback-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -219,11 +216,13 @@
             isRoundTransitioning: false
         };
 
-        // --- Kararlı Takip Motoru Değişkenleri (Delta Tabanlı) ---
+        // --- Safari İçin Optimize Edilmiş Filtre Motoru ---
         let currentX = 0, currentY = 0;   
         let targetX = 0, targetY = 0;     
-        const LERP_FACTOR = 0.12; // Yumuşak süzülme katsayısı (Sakkad engelleme)
-        const CLAMP_VAL = 90;     // Maksimum esneme sınırı
+        
+        // Sarsıntıyı engellemek için filtreyi daha da derinleştirdik (0.12 -> 0.07)
+        const LERP_FACTOR = 0.07; 
+        const CLAMP_VAL = 100;     
 
         let lastBeta = null;
         let lastGamma = null;
@@ -241,7 +240,6 @@
 
         function playSound(type) {
             if (!audioCtx) return;
-            // Safari için ses askıya alındıysa canlandır
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
@@ -252,15 +250,15 @@
 
             if (type === 'correct') {
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-                osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.15); // G5
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.15);
                 gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.3);
             } else if (type === 'wrong') {
                 osc.type = 'triangle';
-                osc.frequency.setValueAtTime(130.81, audioCtx.currentTime); // C3
+                osc.frequency.setValueAtTime(130.81, audioCtx.currentTime);
                 osc.frequency.linearRampToValueAtTime(90, audioCtx.currentTime + 0.2);
                 gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
@@ -279,26 +277,24 @@
             initLevelPool();
             generateLevel();
 
-            // Fullscreen tetikleme
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen();
             } else if (document.documentElement.webkitRequestFullscreen) {
                 document.documentElement.webkitRequestFullscreen();
             }
 
-            // Jiroskop İzin Yönetimi (iOS & Android Entegrasyonu)
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission()
                     .then(permissionState => {
                         if (permissionState === 'granted') {
-                            window.addEventListener('deviceorientation', handleOrientationDelta, true);
+                            window.addEventListener('deviceorientation', handleSafariCalibratedOrientation, true);
                         } else {
-                            alert('Sensör izni gerekiyor.');
+                            alert('Sensör izni reddedildi.');
                         }
                     })
                     .catch(console.error);
             } else {
-                window.addEventListener('deviceorientation', handleOrientationDelta, true);
+                window.addEventListener('deviceorientation', handleSafariCalibratedOrientation, true);
             }
 
             startOverlay.style.display = 'none';
@@ -306,59 +302,55 @@
             requestAnimationFrame(updateSceneLoop);
         });
 
-        // --- Delta Tabanlı Yeni Jiroskop Filtre Motoru ---
-        function handleOrientationDelta(event) {
-            let beta = event.beta;   // [-180, 180]
-            let gamma = event.gamma; // [-90, 90]
+        // --- Safari Uyumlu Eksen ve Yön Koruyucu Motor ---
+        function handleSafariCalibratedOrientation(event) {
+            let beta = event.beta;   
+            let gamma = event.gamma; 
 
             if (beta === null || gamma === null) return;
 
-            // İlk veride bir önceki kareyi eşitle ve geç
             if (lastBeta === null || lastGamma === null) {
                 lastBeta = beta;
                 lastGamma = gamma;
                 return;
             }
 
-            // Anlık değişimleri (Delta) yakala
+            // Anlık değişim miktarı (Delta)
             let dBeta = beta - lastBeta;
             let dGamma = gamma - lastGamma;
 
-            // Derece taşmalarını (büyük sıçramaları) absorbe et
-            if (dBeta > 180) dBeta -= 360;
-            if (dBeta < -180) dBeta += 360;
-            if (dGamma > 90) dGamma -= 180;
-            if (dGamma < -90) dGamma += 180;
+            // Safari trigonometrik kırılma koruması (Aşırı sıçramaları yakalayıp nötrleme)
+            if (Math.abs(dBeta) > 100) dBeta = 0;
+            if (Math.abs(dGamma) > 50) dGamma = 0;
 
-            // Telefonun yatay duruş yönüne göre (Geniş mod) yönleri ayarla
             let orientationAngle = window.orientation || (screen.orientation && screen.orientation.angle) || 0;
 
+            // Hassasiyeti çarpanı düşürüldü (4.5 -> 1.8) ve yön kilitlendi
+            const SENSITIVITY = 1.8; 
+
             if (orientationAngle === 90) {
-                // Güç tuşu yukarıda/sağda ise
-                targetX += dBeta * 4.5;
-                targetY += dGamma * 4.5;
+                // Sağ yatay tutuşta Safari eksen eşlemesi
+                targetX += dBeta * SENSITIVITY;
+                targetY += dGamma * SENSITIVITY;
             } else if (orientationAngle === -90 || orientationAngle === 270) {
-                // Güç tuşu aşağıda/solda ise
-                targetX -= dBeta * 4.5;
-                targetY -= dGamma * 4.5;
+                // Sol yatay tutuşta Safari eksen eşlemesi
+                targetX -= dBeta * SENSITIVITY;
+                targetY -= dGamma * SENSITIVITY;
             } else {
-                // Fallback (Dikey veya tanımsızsa)
-                targetX += dGamma * 4.5;
-                targetY += dBeta * 4.5;
+                targetX += dGamma * SENSITIVITY;
+                targetY += dBeta * SENSITIVITY;
             }
 
-            // Sınırlandırma (Dünyanın kaçmasını engelle)
+            // Küplerin ekrandan kaçma sınır kontrolü
             targetX = Math.max(-CLAMP_VAL, Math.min(CLAMP_VAL, targetX));
             targetY = Math.max(-CLAMP_VAL, Math.min(CLAMP_VAL, targetY));
 
-            // Son değerleri güncelle
             lastBeta = beta;
             lastGamma = gamma;
         }
 
-        // --- Render Döngüsü ---
+        // --- Akıcı Render Döngüsü ---
         function updateSceneLoop() {
-            // Lerp (Low Pass) ile pürüzsüzleştirme uyguluyoruz
             currentX += (targetX - currentX) * LERP_FACTOR;
             currentY += (targetY - currentY) * LERP_FACTOR;
 
@@ -366,53 +358,52 @@
             const rightScene = document.getElementById('right-scene');
 
             if (leftScene && rightScene) {
-                // Kamera hareket hissi için sahneyi ters yönde öteliyoruz
+                // Kafayı sağa çevirince dünya sola gitmeli (Doğal VR Etkisi)
                 const transformStr = `translate(${-currentX}px, ${-currentY}px)`;
                 leftScene.style.transform = transformStr;
                 rightScene.style.transform = transformStr;
             }
 
-            // Çarpışma algılayıcıyı çalıştır
             checkGazeRaycast();
-
             requestAnimationFrame(updateSceneLoop);
         }
 
-        // --- Geliştirilmiş Çarpışma Algılama (Raycast) Motoru ---
+        // --- Geliştirilmiş Dinamik Raycast Motoru (Seçim Problemi Çözümü) ---
         function checkGazeRaycast() {
             if (gameState.isRoundTransitioning) return;
 
-            // Sol ve Sağ crosshair elemanlarının ekrandaki mutlak merkez pozisyonlarını alıyoruz
+            // İmleçlerin ekrandaki güncel fiziksel merkez noktaları
             const leftAnchor = document.getElementById('left-crosshair-anchor').getBoundingClientRect();
             const rightAnchor = document.getElementById('right-crosshair-anchor').getBoundingClientRect();
 
-            // Sol gözdeki ve sağ gözdeki tüm seçenek kartlarını çek
             const leftOptions = document.querySelectorAll('#left-scene .option-wrapper');
             const rightOptions = document.querySelectorAll('#right-scene .option-wrapper');
 
             let detectedIndex = -1;
+            
+            // Çarpışma hassasiyeti için tolerans payı (piksel genişletme)
+            const TOLERANCE = 5;
 
-            // 1. Sol göz alanını test et
+            // Sol göz taraması
             leftOptions.forEach(el => {
                 const rect = el.getBoundingClientRect();
-                if (leftAnchor.left >= rect.left && leftAnchor.left <= rect.right &&
-                    leftAnchor.top >= rect.top && leftAnchor.top <= rect.bottom) {
+                if (leftAnchor.left + 20 >= (rect.left - TOLERANCE) && leftAnchor.left - 20 <= (rect.right + TOLERANCE) &&
+                    leftAnchor.top + 20 >= (rect.top - TOLERANCE) && leftAnchor.top - 20 <= (rect.bottom + TOLERANCE)) {
                     detectedIndex = parseInt(el.getAttribute('data-index'));
                 }
             });
 
-            // 2. Sağ göz alanını test et (Kullanıcı hangi göz alanıyla odaklanırsa odaklansın yakalar)
+            // Sağ göz taraması
             if (detectedIndex === -1) {
                 rightOptions.forEach(el => {
                     const rect = el.getBoundingClientRect();
-                    if (rightAnchor.left >= rect.left && rightAnchor.left <= rect.right &&
-                        rightAnchor.top >= rect.top && rightAnchor.top <= rect.bottom) {
+                    if (rightAnchor.left + 20 >= (rect.left - TOLERANCE) && rightAnchor.left - 20 <= (rect.right + TOLERANCE) &&
+                        rightAnchor.top + 20 >= (rect.top - TOLERANCE) && rightAnchor.top - 20 <= (rect.bottom + TOLERANCE)) {
                         detectedIndex = parseInt(el.getAttribute('data-index'));
                     }
                 });
             }
 
-            // Tespit edilen indeksi ve elenme durumunu kontrol et
             if (detectedIndex !== -1 && !gameState.wrongSelections[detectedIndex]) {
                 if (gazeTargetIndex !== detectedIndex) {
                     gazeTargetIndex = detectedIndex;
@@ -447,7 +438,7 @@
             document.getElementById('right-circle').classList.remove('charging');
         }
 
-        // --- Oyun Akış Mantığı ---
+        // --- Oyun Akış Yönetimi ---
         function initLevelPool() {
             if (gameState.level <= 5) {
                 gameState.colors = ['red', 'green'];
@@ -580,7 +571,6 @@
             renderDOMInsideEye('right-scene');
         }
 
-        // Cihaz yönü değiştirildiğinde sensör referansını sıfırla
         window.addEventListener('resize', () => {
             lastBeta = null;
             lastGamma = null;
