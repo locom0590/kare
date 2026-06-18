@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VR Renk Eşleştirme Oyunu</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <style>
+        /* Ekranı VR Box için ikiye bölen bilgilendirme (Gerekirse kullanılabilir) */
+        .vr-info {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 10;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px #000;
+            font-size: 18px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="vr-info" id="levelDisplay">Seviye: 1</div>
+
+    <a-scene>
+        <a-assets>
+            <audio id="sound-correct" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" preload="auto"></audio>
+            <audio id="sound-wrong" src="https://actions.google.com/sounds/v1/alarms/beeps_loop.ogg" preload="auto"></audio>
+        </a-assets>
+
+        <a-entity camera look-controls position="0 1.6 0">
+            <a-cursor id="cursor"
+                animation__click="property: scale; startEvents: click; easing: easeInCasing; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1"
+                animation__fusing="property: scale; startEvents: fusing; easing: easeInCasing; dur: 1000; from: 1 1 1; to: 0.1 0.1 0.1"
+                event-set__mouseenter="_event: mouseenter; color: springgreen"
+                event-set__mouseleave="_event: mouseleave; color: black"
+                raycaster="objects: .clickable"
+                fuse="true" 
+                fuse-timeout="1000"> </a-cursor>
+        </a-entity>
+
+        <a-entity id="reference-panel" position="0 2.5 -3" scale="0.8 0.8 0.8">
+            <a-plane width="2.2" height="2.2" color="#222"></a-plane>
+            <a-plane id="ref-0" width="0.9" height="0.9" position="-0.5  0.5 0.01"></a-plane>
+            <a-plane id="ref-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01"></a-plane>
+            <a-plane id="ref-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01"></a-plane>
+            <a-plane id="ref-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01"></a-plane>
+        </a-entity>
+
+        <a-entity id="option-0" class="clickable" position="-1.8 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane width="2.2" height="2.2" color="#111"></a-plane>
+            <a-plane id="opt-0-0" width="0.9" height="0.9" position="-0.5  0.5 0.01"></a-plane>
+            <a-plane id="opt-0-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01"></a-plane>
+            <a-plane id="opt-0-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01"></a-plane>
+            <a-plane id="opt-0-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01"></a-plane>
+            <a-text id="feedback-0" value="" align="center" color="white" position="0 0 0.05" scale="4 4 4"></a-text>
+        </a-entity>
+
+        <a-entity id="option-1" class="clickable" position="0 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane width="2.2" height="2.2" color="#111"></a-plane>
+            <a-plane id="opt-1-0" width="0.9" height="0.9" position="-0.5  0.5 0.01"></a-plane>
+            <a-plane id="opt-1-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01"></a-plane>
+            <a-plane id="opt-1-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01"></a-plane>
+            <a-plane id="opt-1-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01"></a-plane>
+            <a-text id="feedback-1" value="" align="center" color="white" position="0 0 0.05" scale="4 4 4"></a-text>
+        </a-entity>
+
+        <a-entity id="option-2" class="clickable" position="1.8 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane width="2.2" height="2.2" color="#111"></a-plane>
+            <a-plane id="opt-2-0" width="0.9" height="0.9" position="-0.5  0.5 0.01"></a-plane>
+            <a-plane id="opt-2-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01"></a-plane>
+            <a-plane id="opt-2-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01"></a-plane>
+            <a-plane id="opt-2-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01"></a-plane>
+            <a-text id="feedback-2" value="" align="center" color="white" position="0 0 0.05" scale="4 4 4"></a-text>
+        </a-entity>
+
+        <a-sky color="#ECECEC"></a-sky>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="40" height="40" color="#7BC8A4"></a-plane>
+    </a-scene>
+
+    <script>
+        // OYUN DEĞİŞKENLERİ
+        let currentLevel = 1;
+        const colorPalette = ['#FF0000', '#00FF00', '#FFFF00', '#0000FF']; // Kırmızı, Yeşil, Sarı, Mavi
+        let currentColors = [];
+        let correctOptionIndex = 0;
+        let isWaitingNextLevel = false;
+
+        // Seviyeye göre aktif olan renk havuzunu döner
+        function getAvailableColors(level) {
+            if (level <= 5) {
+                return [colorPalette[0], colorPalette[1]]; // İlk 5 seviye: Kırmızı, Yeşil
+            } else if (level <= 10) {
+                return [colorPalette[0], colorPalette[1], colorPalette[2]]; // 6-10: + Sarı
+            } else {
+                return [colorPalette[0], colorPalette[1], colorPalette[2], colorPalette[3]]; // 11+: + Mavi
+            }
+        }
+
+        // Rastgele 4'lü renk kombinasyonu üretir
+        function generateRandomPattern(colorsPool) {
+            let pattern = [];
+            for(let i=0; i<4; i++) {
+                const randomIndex = Math.floor(Math.random() * colorsPool.length);
+                pattern.push(colorsPool[randomIndex]);
+            }
+            return pattern;
+        }
+
+        // İki desenin aynı olup olmadığını kontrol eder
+        function arraysEqual(a, b) {
+            return a.every((val, index) => val === b[index]);
+        }
+
+        // Oyunu ve seviyeyi kuran ana fonksiyon
+        function initLevel() {
+            isWaitingNextLevel = false;
+            document.getElementById('levelDisplay').innerText = "Seviye: " + currentLevel;
+
+            const pool = getAvailableColors(currentLevel);
+            
+            // 1. Referans kareyi oluştur ve boya
+            currentColors = generateRandomPattern(pool);
+            for(let i=0; i<4; i++) {
+                document.getElementById(`ref-${i}`).setAttribute('color', currentColors[i]);
+            }
+
+            // 2. Doğru seçeneğin hangisi olacağını rastgele seç (0, 1 veya 2)
+            correctOptionIndex = Math.floor(Math.random() * 3);
+
+            // 3. Seçenekleri oluştur ve boya
+            for(let opt=0; opt<3; opt++) {
+                // Geri bildirim yazılarını sıfırla (X veya Tik işaretlerini temizle)
+                const textEl = document.getElementById(`feedback-${opt}`);
+                textEl.setAttribute('value', '');
+                textEl.setAttribute('color', 'white');
+
+                let optPattern;
+                if(opt === correctOptionIndex) {
+                    optPattern = [...currentColors]; // Doğru seçenek birebir aynı
+                } else {
+                    // Yanlış seçenek üret (Referansın aynısı olmadığına emin olana kadar döngü kur)
+                    do {
+                        optPattern = generateRandomPattern(pool);
+                    } while (arraysEqual(optPattern, currentColors));
+                }
+
+                // Seçeneğin alt karelerini boya
+                for(let i=0; i<4; i++) {
+                    document.getElementById(`opt-${opt}-${i}`).setAttribute('color', optPattern[i]);
+                }
+            }
+        }
+
+        // Seçeneklere bakıldığında (tetiklendiğinde) çalışacak tıklama olayı
+        function setupEventListeners() {
+            for(let opt=0; opt<3; opt++) {
+                const optionEl = document.getElementById(`option-${opt}`);
+                const textEl = document.getElementById(`feedback-${opt}`);
+
+                optionEl.addEventListener('click', function() {
+                    // Eğer zaten doğru bilinmiş ve sonraki seviye bekleniyorsa tıklamayı es geç
+                    if(isWaitingNextLevel) return;
+
+                    if(opt === correctOptionIndex) {
+                        // DOĞRU SEÇENEK
+                        isWaitingNextLevel = true;
+                        textEl.setAttribute('value', 'Y'); // A-Frame fontlarında standart tik işareti bazen desteklenmez, 'Y' veya 'O' harfi veya 'v' yeşil yapılabilir. Buraya 'O' (Oldu) yazalım.
+                        textEl.setAttribute('value', 'O'); 
+                        textEl.setAttribute('color', '#00FF00'); // Yeşil renk
+                        
+                        // Doğru Sesini Çal
+                        document.getElementById('sound-correct').components.sound.playSound();
+
+                        // 1.5 saniye sonra yeni seviyeye geç
+                        setTimeout(() => {
+                            currentLevel++;
+                            initLevel();
+                        }, 1500);
+
+                    } else {
+                        // YANLIŞ SEÇENEK
+                        textEl.setAttribute('value', 'X');
+                        textEl.setAttribute('color', '#FF0000'); // Kırmızı renk
+                        
+                        // Yanlış Sesini Çal
+                        document.getElementById('sound-wrong').components.sound.playSound();
+
+                        // Kullanıcı kafasını başka yere çekince X işaretinin kaybolmasını istersen alt satırı kullanabilirsin
+                        // Ancak kural gereği doğruyu bulana kadar kalması istendiği için dokunmuyoruz.
+                    }
+                });
+            }
+        }
+
+        // Sayfa yüklendiğinde A-Frame sahnelerinin hazır olmasını bekle ve oyunu başlat
+        window.addEventListener('load', () => {
+            // Ses bileşenlerini programatik olarak bağla (iOS/Android tarayıcı kısıtlamaları için)
+            document.getElementById('sound-correct').setAttribute('sound', 'src: #sound-correct; volume: 1');
+            document.getElementById('sound-wrong').setAttribute('sound', 'src: #sound-wrong; volume: 1');
+            
+            initLevel();
+            setupEventListeners();
+        });
+    </script>
+</body>
+</html>
