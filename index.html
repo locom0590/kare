@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VR Oyun - Adım 2: Akıllı Takip Sistemi</title>
+    <title>VR Oyun - Adım 2: Sabitlenmiş Takip</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #1a252f; font-family: sans-serif; }
@@ -27,18 +27,14 @@
             overflow: hidden;
         }
 
-        /* Kamera ve Küplerin Dünyası: Yumuşak takip için geçiş efekti ekledik */
         .camera-world {
             position: absolute; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: space-around; align-items: center;
             padding: 40px 0;
             transform-origin: center center;
             will-change: transform;
-            /* Kafanı çevirdiğinde küpler arkandan yumuşakça (0.3 saniyede) merkeze akacak */
-            transition: transform 0.3s ease-out; 
         }
 
-        /* İmleç (Crosshair): Anlık hareket eder, yumuşatması yoktur. Böylece hedef alabilirsin. */
         .cursor {
             position: absolute; top: 50%; left: 50%;
             width: 14px; height: 14px; background: transparent;
@@ -47,7 +43,6 @@
             z-index: 100; pointer-events: none; box-shadow: 0 0 6px #000;
             will-change: transform;
         }
-        /* Bakarken imleç kırmızı bir noktaya dönüşür */
         .cursor.fusing { background: #e74c3c; border-color: #e74c3c; transform: translate(-50%, -50%) scale(0.5); }
 
         .matrix-container {
@@ -70,8 +65,8 @@
 <body>
 
     <div id="start-screen">
-        <h2>VR Akıllı Takip Sistemi</h2>
-        <p>Küplerin her zaman tam karşınızda kalması ve yumuşakça sizi takip etmesi için başlatın.</p>
+        <h2>VR Sarsıntı Filtreli Takip</h2>
+        <p>Atlamaları ve yön hatalarını düzelten kararlı sürüm için başlatın.</p>
         <button id="start-btn">BAŞLAT</button>
     </div>
 
@@ -130,9 +125,13 @@
         let isFusing = false;
         let currentTargetIndex = null;
         
-        // İlk açılış açılarını sıfırlamak (ofsetlemek) için değişkenler
         let initialBeta = null;
         let initialGamma = null;
+
+        // Yumuşatma (Filtreleme) için mevcut ve hedef konum kayıtları
+        let currentX = 0, currentY = 0;
+        let targetX = 0, targetY = 0;
+        const lerpFactor = 0.15; // Değer küçüldükçe hareket yumuşar ve sıçramalar yok olur (0.15 ideal)
 
         const leftCursor = document.getElementById('cursor-left');
         const rightCursor = document.getElementById('cursor-right');
@@ -154,43 +153,57 @@
                 document.documentElement.requestFullscreen().catch(() => {});
             }
             window.addEventListener('deviceorientation', handleOrientation, true);
-            setInterval(checkGazeCollision, 50); // Çarpışma testini hızlandırdık (daha hassas)
+            
+            // Ekran yenileme hızına (60fps) senkronize animasyon döngüsü (Sıçramaları engeller)
+            function updateLoop() {
+                // Low-pass filtre / Lerp formülü ile hedefe yumuşak geçiş
+                currentX += (targetX - currentX) * lerpFactor;
+                currentY += (targetY - currentY) * lerpFactor;
+
+                // Maksimum ekran dışına kaçma sınırı koyduk (Kareler asla tamamen gözden kaybolamaz)
+                const maxLimitX = window.innerHeight * 0.35;
+                const maxLimitY = window.innerWidth * 0.20;
+                
+                const clampedX = Math.max(-maxLimitX, Math.min(maxLimitX, currentX));
+                const clampedY = Math.max(-maxLimitY, Math.min(maxLimitY, currentY));
+
+                // Doğru yönlendirilmiş eksen atamaları
+                leftCursor.style.transform = `translate(calc(-50% + ${clampedY}px), calc(-50% + ${clampedX}px))`;
+                rightCursor.style.transform = `translate(calc(-50% + ${clampedY}px), calc(-50% + ${clampedX}px))`;
+
+                const worldTransform = `translate(${clampedY * 0.6}px, ${clampedX * 0.6}px)`;
+                worldLeft.style.transform = worldTransform;
+                worldRight.style.transform = worldTransform;
+
+                checkGazeCollision();
+                requestAnimationFrame(updateLoop);
+            }
+            requestAnimationFrame(updateLoop);
         }
 
         function handleOrientation(event) {
-            // İlk açılışta telefonun durduğu açıyı referans al (Kareler tam karşında başlasın)
             if (initialBeta === null && event.beta !== null) {
                 initialBeta = event.beta;
                 initialGamma = event.gamma;
             }
 
-            let deltaX = 0;
-            let deltaY = 0;
-
-            if (window.orientation === 90 || window.orientation === -90) {
-                deltaX = (event.beta - initialBeta) * 5;
-                deltaY = (event.gamma - initialGamma) * 5;
+            // VR Box yatay pozisyonunda eksen yönlerinin doğrulanması
+            if (window.orientation === 90) {
+                targetX = (event.beta - initialBeta) * 5.5;
+                targetY = (event.gamma - initialGamma) * 5.5;
+            } else if (window.orientation === -90) {
+                targetX = -(event.beta - initialBeta) * 5.5;
+                targetY = -(event.gamma - initialGamma) * 5.5;
             } else {
-                deltaX = (event.gamma - initialGamma) * 5;
-                deltaY = (event.beta - initialBeta) * 5;
+                targetX = (event.gamma - initialGamma) * 5.5;
+                targetY = (event.beta - initialBeta) * 5.5;
             }
-
-            // İMLEÇ HAREKETİ: İmleç, kafa hareketine anında tepki verir (Hızlı kayar)
-            leftCursor.style.transform = `translate(calc(-50% + ${deltaY}px), calc(-50% + ${deltaX}px))`;
-            rightCursor.style.transform = `translate(calc(-50% + ${deltaY}px), calc(-50% + ${deltaX}px))`;
-
-            // KÜPLERİN HAREKETİ (YUMUŞAK TAKİP): Küpler de imlecin gittiği yöne doğru yavaşça süzülür.
-            // Böylece küpler ekranın dışına kaçamaz, hep ortada toplanmaya çalışır.
-            const worldTransform = `translate(${deltaY * 0.7}px, ${deltaX * 0.7}px)`;
-            worldLeft.style.transform = worldTransform;
-            worldRight.style.transform = worldTransform;
         }
 
         function checkGazeCollision() {
             const optionBoxes = worldLeft.querySelectorAll('.option-box');
             let hitDetected = false;
 
-            // İmlecin o anki dinamik konumunu alıp kutularla çakışıp çakışmadığına bakıyoruz
             const cursorRect = leftCursor.getBoundingClientRect();
             const cx = cursorRect.left + (cursorRect.width / 2);
             const cy = cursorRect.top + (cursorRect.height / 2);
