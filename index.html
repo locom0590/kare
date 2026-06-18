@@ -2,244 +2,588 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VR Oyun - Adım 2: Sabitlenmiş Takip</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>VR Web Gaze Matching Game</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #1a252f; font-family: sans-serif; }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: sans-serif;
+        }
 
-        #start-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #111; color: white; z-index: 9999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            padding: 20px; text-align: center;
+        /* Başlatma Ekranı */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: #fff;
         }
         #start-btn {
-            padding: 15px 30px; font-size: 18px; background: #27ae60;
-            color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;
+            padding: 20px 40px;
+            font-size: 24px;
             font-weight: bold;
+            background: #25d366;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,250,0,0.3);
         }
 
-        .vr-mode { display: flex; width: 100%; height: 100%; }
-        .eye-screen {
-            position: relative; width: 50%; height: 100%;
-            border-right: 1px solid rgba(255,255,255,0.1);
+        /* Ana VR Düzeni: İki Eşit Parça */
+        #vr-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            visibility: hidden;
+        }
+        .eye-view {
+            position: relative;
+            width: 50vw;
+            height: 100vh;
             overflow: hidden;
+            background: #1a1a1a;
+            border-right: 1px solid #000; /* Ayrım çizgisi */
+        }
+        .eye-view:last-child {
+            border-right: none;
         }
 
-        .camera-world {
-            position: absolute; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: space-around; align-items: center;
-            padding: 40px 0;
-            transform-origin: center center;
+        /* Sabit Crosshair (Hedef İmleci) */
+        .crosshair-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            z-index: 100;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .crosshair-dot {
+            width: 6px;
+            height: 6px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+        }
+        .crosshair-circle {
+            width: 30px;
+            height: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            transition: transform 0.1s linear, border-color 0.2s;
+        }
+        /* Gaze yükleniyor efekti sınıfı */
+        .crosshair-circle.charging {
+            transform: scale(0.4);
+            border-color: #ffeb3b;
+        }
+
+        /* Hareketli Sahne İçeriği (Dünya) */
+        .scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: center;
+            padding: 40px 10px;
             will-change: transform;
         }
 
-        .cursor {
-            position: absolute; top: 50%; left: 50%;
-            width: 14px; height: 14px; background: transparent;
-            border: 3px solid white;
-            border-radius: 50%; transform: translate(-50%, -50%);
-            z-index: 100; pointer-events: none; box-shadow: 0 0 6px #000;
-            will-change: transform;
-        }
-        .cursor.fusing { background: #e74c3c; border-color: #e74c3c; transform: translate(-50%, -50%) scale(0.5); }
-
+        /* Matrisler (Kareler) */
         .matrix-container {
-            display: grid; grid-template-columns: repeat(2, 1fr);
-            width: 120px; height: 120px; background: #222; padding: 5px; gap: 5px;
-            border-radius: 8px; transition: background 0.3s;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            width: 100px;
+            height: 100px;
+            border: 2px solid #fff;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
         }
-        .small-square { border-radius: 3px; }
-        .reference-box { transform: scale(1.1); border: 3px solid #fff; }
-        
-        .options-group { display: flex; gap: 15px; justify-content: center; width: 100%; }
-        .option-box { transform: scale(0.85); }
+        .sub-square {
+            width: 100%;
+            height: 100%;
+            border: 1px solid rgba(0, 0, 0, 0.3);
+        }
 
-        .c-red { background: #FF0000; }
-        .c-green { background: #00FF00; }
-        .c-yellow { background: #FFFF00; }
-        .c-blue { background: #0000FF; }
+        /* Referans Alanı */
+        .reference-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .level-text {
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* Seçenekler Alanı */
+        .options-zone {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            width: 100%;
+        }
+        .option-wrapper {
+            position: relative;
+            cursor: pointer;
+        }
+
+        /* Geri Bildirim Katmanları (X ve Tik) */
+        .feedback-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            font-weight: bold;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .feedback-overlay.wrong {
+            background: rgba(255, 0, 0, 0.6);
+            color: #fff;
+            opacity: 1;
+        }
+        .feedback-overlay.correct {
+            background: rgba(0, 255, 0, 0.6);
+            color: #fff;
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
 
-    <div id="start-screen">
-        <h2>VR Sarsıntı Filtreli Takip</h2>
-        <p>Atlamaları ve yön hatalarını düzelten kararlı sürüm için başlatın.</p>
-        <button id="start-btn">BAŞLAT</button>
+    <div id="start-overlay">
+        <h2 style="margin-bottom: 20px; text-align: center;">VR Gaze Matching Game</h2>
+        <p style="margin-bottom: 30px; color: #aaa; text-align: center; max-width: 80%;">Cihazı yatay çevirip VR Box gözlüğünüze takın. Jiroskop ve tam ekran izni için butona basın.</p>
+        <button id="start-btn">OYUNU BAŞLAT</button>
     </div>
 
-    <div class="vr-mode">
-        <div class="eye-screen">
-            <div class="cursor" id="cursor-left"></div>
-            <div class="camera-world" id="world-left">
-                <div class="matrix-container reference-box">
-                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
-                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                </div>
-                <div class="options-group">
-                    <div class="matrix-container option-box" data-index="0">
-                        <div class="small-square c-green"></div><div class="small-square c-red"></div>
-                        <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
-                    </div>
-                    <div class="matrix-container option-box" data-index="1">
-                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
-                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                    </div>
-                    <div class="matrix-container option-box" data-index="2">
-                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
-                    </div>
-                </div>
+    <div id="vr-container">
+        <div class="eye-view" id="left-eye">
+            <div class="crosshair-container">
+                <div class="crosshair-dot"></div>
+                <div class="crosshair-circle" id="left-circle"></div>
             </div>
+            <div class="scene" id="left-scene">
+                </div>
         </div>
 
-        <div class="eye-screen">
-            <div class="cursor" id="cursor-right"></div>
-            <div class="camera-world" id="world-right">
-                <div class="matrix-container reference-box">
-                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
-                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                </div>
-                <div class="options-group">
-                    <div class="matrix-container option-box" data-index="0">
-                        <div class="small-square c-green"></div><div class="small-square c-red"></div>
-                        <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
-                    </div>
-                    <div class="matrix-container option-box" data-index="1">
-                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
-                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                    </div>
-                    <div class="matrix-container option-box" data-index="2">
-                        <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
-                        <div class="small-square c-red"></div><div class="small-square c-green"></div>
-                    </div>
-                </div>
+        <div class="eye-view" id="right-eye">
+            <div class="crosshair-container">
+                <div class="crosshair-dot"></div>
+                <div class="crosshair-circle" id="right-circle"></div>
             </div>
+            <div class="scene" id="right-scene">
+                </div>
         </div>
     </div>
 
     <script>
-        let fuseTimer = null;
-        let isFusing = false;
-        let currentTargetIndex = null;
-        
+        // --- Oyun Durumu Tasarımı ---
+        let gameState = {
+            level: 1,
+            colors: ['red', 'green'], // Seviyeye göre dinamik değişecek
+            referenceMatrix: [],      // Üstteki hedef kombinasyon
+            options: [],              // Alttaki 3 seçenek matrisi
+            correctIndex: -1,         // Doğru seçeneğin indeksi (0, 1, 2)
+            wrongSelections: [false, false, false], // Yanlış kilitlenmeler için durum tutucu
+            isRoundTransitioning: false
+        };
+
+        // --- Jiroskop ve Takip Motoru Ayarları ---
+        let currentX = 0, currentY = 0;   // Lerp filtreli mevcut pozisyonlar
+        let targetX = 0, targetY = 0;     // Sensörden gelen anlık hedef pozisyonlar
+        const LERP_FACTOR = 0.15;         // Sarsıntı sönümleme katsayısı
+        const CLAMP_VAL = 60;             // Ekrandan kaçmayı önleme sınırı (piksel cinsinden tolerans)
+
+        // --- Gaze (Bakış Algılama) Ayarları ---
+        let gazeTargetIndex = -1;
+        let gazeTimer = null;
+        const GAZE_DURATION = 1000; // 1 saniye (ms)
+
+        // --- Ses Sentezleyicisi (Web Audio API) ---
+        let audioCtx = null;
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                // Tiz/Pozitif Başarı Sesi
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 notası
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5 notası
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                // Kalın/Pes Hata Sesi
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            }
+        }
+
+        // --- Başlatma Kilidi Yönetimi ---
+        const startBtn = document.getElementById('start-btn');
+        const startOverlay = document.getElementById('start-overlay');
+        const vrContainer = document.getElementById('vr-container');
+
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            initLevelPool();
+            generateLevel();
+
+            // Tam Ekran Kontrolü
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen();
+            }
+
+            // iOS Jiroskop İzin Süreci
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                        } else {
+                            alert('Jiroskop izni reddedildi. Oyun çalışamaz.');
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Android veya Standart Tarayıcılar
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+
+            // Ekran kilidini aç ve render döngüsünü başlat
+            startOverlay.style.display = 'none';
+            vrContainer.style.visibility = 'visible';
+            requestAnimationFrame(updateSceneLoop);
+        });
+
+        // --- Jiroskop Veri İşleme & Yön Simülasyonu ---
         let initialBeta = null;
         let initialGamma = null;
 
-        // Yumuşatma (Filtreleme) için mevcut ve hedef konum kayıtları
-        let currentX = 0, currentY = 0;
-        let targetX = 0, targetY = 0;
-        const lerpFactor = 0.15; // Değer küçüldükçe hareket yumuşar ve sıçramalar yok olur (0.15 ideal)
-
-        const leftCursor = document.getElementById('cursor-left');
-        const rightCursor = document.getElementById('cursor-right');
-        const worldLeft = document.getElementById('world-left');
-        const worldRight = document.getElementById('world-right');
-
-        document.getElementById('start-btn').addEventListener('click', async function() {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
-                    const permissionState = await DeviceOrientationEvent.requestPermission();
-                    if (permissionState === 'granted') { initVR(); }
-                } catch (error) { console.error(error); }
-            } else { initVR(); }
-        });
-
-        function initVR() {
-            document.getElementById('start-screen').style.display = 'none';
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen().catch(() => {});
-            }
-            window.addEventListener('deviceorientation', handleOrientation, true);
-            
-            // Ekran yenileme hızına (60fps) senkronize animasyon döngüsü (Sıçramaları engeller)
-            function updateLoop() {
-                // Low-pass filtre / Lerp formülü ile hedefe yumuşak geçiş
-                currentX += (targetX - currentX) * lerpFactor;
-                currentY += (targetY - currentY) * lerpFactor;
-
-                // Maksimum ekran dışına kaçma sınırı koyduk (Kareler asla tamamen gözden kaybolamaz)
-                const maxLimitX = window.innerHeight * 0.35;
-                const maxLimitY = window.innerWidth * 0.20;
-                
-                const clampedX = Math.max(-maxLimitX, Math.min(maxLimitX, currentX));
-                const clampedY = Math.max(-maxLimitY, Math.min(maxLimitY, currentY));
-
-                // Doğru yönlendirilmiş eksen atamaları
-                leftCursor.style.transform = `translate(calc(-50% + ${clampedY}px), calc(-50% + ${clampedX}px))`;
-                rightCursor.style.transform = `translate(calc(-50% + ${clampedY}px), calc(-50% + ${clampedX}px))`;
-
-                const worldTransform = `translate(${clampedY * 0.6}px, ${clampedX * 0.6}px)`;
-                worldLeft.style.transform = worldTransform;
-                worldRight.style.transform = worldTransform;
-
-                checkGazeCollision();
-                requestAnimationFrame(updateLoop);
-            }
-            requestAnimationFrame(updateLoop);
-        }
-
         function handleOrientation(event) {
-            if (initialBeta === null && event.beta !== null) {
+            // İlk açılış referans açılarını sabitleme
+            if (initialBeta === null) {
                 initialBeta = event.beta;
                 initialGamma = event.gamma;
+                return;
             }
 
-            // VR Box yatay pozisyonunda eksen yönlerinin doğrulanması
+            // Yatay modda (Landscape) eksen haritalaması
+            let deltaX = 0;
+            let deltaY = 0;
+
             if (window.orientation === 90) {
-                targetX = (event.beta - initialBeta) * 5.5;
-                targetY = (event.gamma - initialGamma) * 5.5;
+                deltaX = event.beta - initialBeta;
+                deltaY = -(event.gamma - initialGamma);
             } else if (window.orientation === -90) {
-                targetX = -(event.beta - initialBeta) * 5.5;
-                targetY = -(event.gamma - initialGamma) * 5.5;
+                deltaX = -(event.beta - initialBeta);
+                deltaY = event.gamma - initialGamma;
             } else {
-                targetX = (event.gamma - initialGamma) * 5.5;
-                targetY = (event.beta - initialBeta) * 5.5;
+                // Varsayılan dikey duruş emülasyonu toleransı
+                deltaX = event.gamma - initialGamma;
+                deltaY = event.beta - initialBeta;
+            }
+
+            // Katsayılar ile hassasiyet ve sığlık ölçeklemesi
+            targetX = deltaX * 12; 
+            targetY = deltaY * 12;
+
+            // Clamping: Sahnenin ekran dışına çok fazla kaçmasını engelleme
+            targetX = Math.max(-CLAMP_VAL, Math.min(CLAMP_VAL, targetX));
+            targetY = Math.max(-CLAMP_VAL, Math.min(CLAMP_VAL, targetY));
+        }
+
+        // --- Lerp Tabanlı Akıcı Motor Döngüsü (Render Loop) ---
+        function updateSceneLoop() {
+            // Low-pass filter (Lerp) formülü: Mevcut + (Hedef - Mevcut) * Katsayı
+            currentX += (targetX - currentX) * LERP_FACTOR;
+            currentY += (targetY - currentY) * LERP_FACTOR;
+
+            const leftScene = document.getElementById('left-scene');
+            const rightScene = document.getElementById('right-scene');
+
+            // Kullanıcı kafasını sağa çevirirse dünya sola kaymalı ki imleç sağa gitmiş hissi uyansın.
+            if (leftScene && rightScene) {
+                const transformString = `translate(${-currentX}px, ${-currentY}px)`;
+                leftScene.style.transform = transformString;
+                rightScene.style.transform = transformString;
+            }
+
+            // Her kare yenilenmesinde bakış (Gaze) raycast mekanizmasını tetikle
+            checkGazeCollision();
+
+            requestAnimationFrame(updateSceneLoop);
+        }
+
+        // --- Oyun Mekaniği & Renk Havuzu Tasarımı ---
+        function initLevelPool() {
+            if (gameState.level <= 5) {
+                gameState.colors = ['red', 'green'];
+            } else if (gameState.level <= 10) {
+                gameState.colors = ['red', 'green', 'yellow'];
+            } else {
+                gameState.colors = ['red', 'green', 'yellow', 'blue'];
             }
         }
 
+        function generateRandomMatrix() {
+            let matrix = [];
+            for (let i = 0; i < 4; i++) {
+                const randomIndex = Math.floor(Math.random() * gameState.colors.length);
+                matrix.push(gameState.colors[randomIndex]);
+            }
+            return matrix;
+        }
+
+        function isMatricesEqual(m1, m2) {
+            return m1.every((val, index) => val === m2[index]);
+        }
+
+        function generateLevel() {
+            initLevelPool();
+            gameState.wrongSelections = [false, false, false];
+            gameState.isRoundTransitioning = false;
+            resetCrosshairEffects();
+
+            // 1. Referans matrisi üret
+            gameState.referenceMatrix = generateRandomMatrix();
+
+            // 2. Doğru seçeneğin hangi indekste olacağını seç (0, 1 veya 2)
+            gameState.correctIndex = Math.floor(Math.random() * 3);
+
+            // 3. Seçenekleri dağıt
+            gameState.options = [];
+            for (let i = 0; i < 3; i++) {
+                if (i === gameState.correctIndex) {
+                    gameState.options.push([...gameState.referenceMatrix]);
+                } else {
+                    let wrongMatrix;
+                    // Kesinlikle referans kareden farklı olana kadar üret
+                    do {
+                        wrongMatrix = generateRandomMatrix();
+                    } while (isMatricesEqual(wrongMatrix, gameState.referenceMatrix));
+                    gameState.options.push(wrongMatrix);
+                }
+            }
+
+            // Göz arayüzlerini senkronize oluştur
+            renderDOMInsideEye('left-scene');
+            renderDOMInsideEye('right-scene');
+        }
+
+        // --- DOM Enjeksiyon Motoru ---
+        function renderDOMInsideEye(sceneId) {
+            const sceneEl = document.getElementById(sceneId);
+            sceneEl.innerHTML = '';
+
+            // Üst Kısım: Referans Zone
+            const refZone = document.createElement('div');
+            refZone.className = 'reference-zone';
+            
+            const lvlText = document.createElement('div');
+            lvlText.className = 'level-text';
+            lvlText.innerText = `SEVİYE: ${gameState.level}`;
+            refZone.appendChild(lvlText);
+
+            const refMatrixEl = createMatrixDOM(gameState.referenceMatrix);
+            refZone.appendChild(refMatrixEl);
+            sceneEl.appendChild(refZone);
+
+            // Alt Kısım: Seçenekler Zone
+            const optionsZone = document.createElement('div');
+            optionsZone.className = 'options-zone';
+
+            gameState.options.forEach((matrixData, idx) => {
+                const optWrapper = document.createElement('div');
+                optWrapper.className = 'option-wrapper';
+                optWrapper.setAttribute('data-index', idx);
+
+                const matrixEl = createMatrixDOM(matrixData);
+                optWrapper.appendChild(matrixEl);
+
+                // Geri bildirim katmanı (X veya Tik)
+                const feedbackOverlay = document.createElement('div');
+                feedbackOverlay.className = 'feedback-overlay';
+                if (gameState.wrongSelections[idx]) {
+                    feedbackOverlay.classList.add('wrong');
+                    feedbackOverlay.innerHTML = '&#10006;'; // X işareti
+                } else if (gameState.isRoundTransitioning && idx === gameState.correctIndex) {
+                    feedbackOverlay.classList.add('correct');
+                    feedbackOverlay.innerHTML = '&#10004;'; // Tik işareti
+                }
+                optWrapper.appendChild(feedbackOverlay);
+
+                optionsZone.appendChild(optWrapper);
+            });
+
+            sceneEl.appendChild(optionsZone);
+        }
+
+        function createMatrixDOM(matrixColors) {
+            const container = document.createElement('div');
+            container.className = 'matrix-container';
+            matrixColors.forEach(color => {
+                const subSquare = document.createElement('div');
+                subSquare.className = 'sub-square';
+                subSquare.style.backgroundColor = color;
+                container.appendChild(subSquare);
+            });
+            return container;
+        }
+
+        // --- Bakış Algılama ve Geometrik Çarpışma Testi (Raycast Emülasyonu) ---
         function checkGazeCollision() {
-            const optionBoxes = worldLeft.querySelectorAll('.option-box');
-            let hitDetected = false;
+            if (gameState.isRoundTransitioning) return;
 
-            const cursorRect = leftCursor.getBoundingClientRect();
-            const cx = cursorRect.left + (cursorRect.width / 2);
-            const cy = cursorRect.top + (cursorRect.height / 2);
+            // Ekran ortasındaki crosshair koordinat referansı
+            const screenCenterX = window.innerWidth / 4; // Sol göz merkezi simetrisi
+            const screenCenterY = window.innerHeight / 2;
 
-            optionBoxes.forEach(box => {
-                const rect = box.getBoundingClientRect();
-                if (cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom) {
-                    hitDetected = true;
-                    const index = box.getAttribute('data-index');
-                    if (!isFusing || currentTargetIndex !== index) { startFusing(index); }
+            // Sol sahnedeki seçeneklerin koordinatlarını oku (Sol ve sağ birebir simetrik çalıştığı için yeterlidir)
+            const optionElements = document.querySelectorAll('#left-scene .option-wrapper');
+            let hitIndex = -1;
+
+            optionElements.forEach(el => {
+                const rect = el.getBoundingClientRect();
+                // Crosshair elemanın sınırları içinde mi?
+                if (screenCenterX >= rect.left && screenCenterX <= rect.right &&
+                    screenCenterY >= rect.top && screenCenterY <= rect.bottom) {
+                    hitIndex = parseInt(el.getAttribute('data-index'));
                 }
             });
 
-            if (!hitDetected && isFusing) { cancelFusing(); }
+            // Eğer bir seçeneğin üzerine odaklanıldıysa ve bu seçenek zaten yanlış bilinip elenmediyse
+            if (hitIndex !== -1 && !gameState.wrongSelections[hitIndex]) {
+                if (gazeTargetIndex !== hitIndex) {
+                    // Yeni bir kutuya odaklanma anı: Sayacı başlat
+                    gazeTargetIndex = hitIndex;
+                    startGazeCharging();
+                }
+            } else {
+                // Boşluğa bakıldıysa veya elenmiş kutuya bakıldıysa süreci iptal et
+                if (gazeTargetIndex !== -1) {
+                    gazeTargetIndex = -1;
+                    cancelGazeCharging();
+                }
+            }
         }
 
-        function startFusing(index) {
-            isFusing = true;
-            currentTargetIndex = index;
-            leftCursor.classList.add('fusing');
-            rightCursor.classList.add('fusing');
+        // --- Gaze Görsel Efekt ve Tetikleyicileri ---
+        function startGazeCharging() {
+            if (gazeTimer) clearTimeout(gazeTimer);
 
-            fuseTimer = setTimeout(() => {
-                const allMatches = document.querySelectorAll(`.option-box[data-index="${currentTargetIndex}"]`);
-                allMatches.forEach(b => b.style.backgroundColor = '#FFFFFF');
-                cancelFusing();
-            }, 1000);
+            // İmleç küçülme/dolma animasyonunu başlat
+            document.getElementById('left-circle').classList.add('charging');
+            document.getElementById('right-circle').classList.add('charging');
+
+            gazeTimer = setTimeout(() => {
+                evaluateSelection(gazeTargetIndex);
+            }, GAZE_DURATION);
         }
 
-        function cancelFusing() {
-            clearTimeout(fuseTimer);
-            isFusing = false;
-            currentTargetIndex = null;
-            leftCursor.classList.remove('fusing');
-            rightCursor.classList.remove('fusing');
+        function cancelGazeCharging() {
+            if (gazeTimer) {
+                clearTimeout(gazeTimer);
+                gazeTimer = null;
+            }
+            resetCrosshairEffects();
         }
+
+        function resetCrosshairEffects() {
+            document.getElementById('left-circle').classList.remove('charging');
+            document.getElementById('right-circle').classList.remove('charging');
+        }
+
+        // --- Doğruluk ve Karar Kontrol Mekanizması ---
+        function evaluateSelection(index) {
+            gazeTargetIndex = -1;
+            cancelGazeCharging();
+
+            if (index === gameState.correctIndex) {
+                // DOĞRU SEÇENEK
+                gameState.isRoundTransitioning = true;
+                playSound('correct');
+                
+                // Tik işaretini yansıtmak için DOM güncellemesi
+                renderAllEyes();
+
+                // 1.5 Saniye sonra bir sonraki tura geç
+                setTimeout(() => {
+                    gameState.level++;
+                    generateLevel();
+                }, 1500);
+
+            } else {
+                // YANLIŞ SEÇENEK
+                if (!gameState.wrongSelections[index]) {
+                    gameState.wrongSelections[index] = true;
+                    playSound('wrong');
+                    renderAllEyes();
+                }
+            }
+        }
+
+        function renderAllEyes() {
+            renderDOMInsideEye('left-scene');
+            renderDOMInsideEye('right-scene');
+        }
+
+        // Cihaz oryantasyonu (Yatay/Dikey) değiştiğinde kalibrasyonu tazele
+        window.addEventListener('resize', () => {
+            initialBeta = null;
+            initialGamma = null;
+        });
     </script>
 </body>
 </html>
