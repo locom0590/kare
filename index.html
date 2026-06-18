@@ -3,18 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VR Oyun - Adım 2: Bakış Mekanizması</title>
+    <title>VR Oyun - Adım 2: Bakış Mekanizması (Düzeltildi)</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <style>
+        /* Tarayıcıyı uyandırmak ve odaklamak için başlangıç ekranı */
+        #vr-start-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; color: white; z-index: 99999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            font-family: Arial, sans-serif; text-align: center;
+        }
+        #start-button {
+            padding: 15px 30px; font-size: 18px; background: #27ae60;
+            color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 15px;
+        }
+    </style>
 </head>
 <body>
 
+    <div id="vr-start-screen">
+        <h2>VR Bakış Testi</h2>
+        <p>Bakış algılamasını aktifleştirmek için lütfen butona basın.</p>
+        <button id="start-button">BAŞLAT VE EKRANA DOKUN</button>
+    </div>
+
     <a-scene>
-        <a-entity camera look-controls position="0 1.6 0">
+        <a-entity camera look-controls position="0 1.6 0" raycaster="objects: .clickable">
             <a-cursor id="cursor" 
-                      color="black"
-                      raycaster="objects: .clickable"
+                      color="#000000"
                       fuse="true" 
-                      fuse-timeout="1000"> </a-cursor>
+                      fuse-timeout="1000"
+                      animation__fusing="property: scale; startEvents: fusing; easing: easeInCasing; dur: 1000; from: 1 1 1; to: 0.1 0.1 0.1"
+                      animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCasing; dur: 150; to: 1 1 1">
+            </a-cursor>
         </a-entity>
 
         <a-entity id="reference-panel" position="0 2.5 -3" scale="0.8 0.8 0.8">
@@ -25,24 +47,24 @@
             <a-plane id="ref-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#0000FF"></a-plane>
         </a-entity>
 
-        <a-entity id="option-0" class="clickable" position="-1.8 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane id="bg-0" width="2.2" height="2.2" color="#111"></a-plane>
+        <a-entity id="option-0" position="-1.8 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane id="bg-0" class="clickable" width="2.2" height="2.2" color="#111"></a-plane>
             <a-plane id="opt-0-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#00FF00"></a-plane>
             <a-plane id="opt-0-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#FF0000"></a-plane>
             <a-plane id="opt-0-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#0000FF"></a-plane>
             <a-plane id="opt-0-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#FFFF00"></a-plane>
         </a-entity>
 
-        <a-entity id="option-1" class="clickable" position="0 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane id="bg-1" width="2.2" height="2.2" color="#111"></a-plane>
+        <a-entity id="option-1" position="0 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane id="bg-1" class="clickable" width="2.2" height="2.2" color="#111"></a-plane>
             <a-plane id="opt-1-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FF0000"></a-plane>
             <a-plane id="opt-1-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#00FF00"></a-plane>
             <a-plane id="opt-1-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FFFF00"></a-plane>
             <a-plane id="opt-1-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#0000FF"></a-plane>
         </a-entity>
 
-        <a-entity id="option-2" class="clickable" position="1.8 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane id="bg-2" width="2.2" height="2.2" color="#111"></a-plane>
+        <a-entity id="option-2" position="1.8 0.8 -3" scale="0.6 0.6 0.6">
+            <a-plane id="bg-2" class="clickable" width="2.2" height="2.2" color="#111"></a-plane>
             <a-plane id="opt-2-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FFFF00"></a-plane>
             <a-plane id="opt-2-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#0000FF"></a-plane>
             <a-plane id="opt-2-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FF0000"></a-plane>
@@ -54,13 +76,18 @@
     </a-scene>
 
     <script>
-        // Seçeneklere 1 saniye bakıldığında çalışacak JavaScript kodu
-        for (let i = 0; i < 3; i++) {
-            document.getElementById(`option-${i}`).addEventListener('click', function () {
-                // Algılamayı test etmek için arkadaki siyah fonu BEYAZ yapıyoruz
-                document.getElementById(`bg-${i}`).setAttribute('color', '#FFFFFF');
-            });
-        }
+        // Başlangıç ekranındaki butona basınca sahneyi ve tarayıcıyı uyandırıyoruz
+        document.getElementById('start-button').addEventListener('click', function() {
+            document.getElementById('vr-start-screen').style.display = 'none';
+            
+            // Dinleyicileri buton tıklandıktan sonra güvenli şekilde bağlıyoruz
+            for (let i = 0; i < 3; i++) {
+                document.getElementById(`bg-${i}`).addEventListener('click', function () {
+                    // Algılama başarılıysa arka plan beyaz olur
+                    this.setAttribute('color', '#FFFFFF');
+                });
+            }
+        });
     </script>
 
 </body>
