@@ -36,7 +36,7 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             border-radius: 15px;
             max-width: 90vw;
-            max-height: 45vh;
+            max-height: 50vh;
         }
 
         /* Seçenekler Alanı */
@@ -96,7 +96,7 @@
 
     <div id="score-board">Skor: <span id="score">0</span></div>
 
-    <canvas id="gameCanvas" width="360" height="360"></canvas>
+    <canvas id="gameCanvas" width="360" height="380"></canvas>
 
     <div id="options-container">
         <div class="option-card" id="opt0" data-index="0"></div>
@@ -106,7 +106,7 @@
 
     <div id="start-overlay">
         <h2>Jiroskop Eşleştirme Oyunu</h2>
-        <p>Oyunu oynamak için telefonunuzu eğmeniz gerekir. Lütfen jiroskop izni verin ve cihazı dik tutun.</p>
+        <p>Oyunu oynamak için telefonunuzu eğmeniz gerekir. Lütfen jiroskop izni verin ve cihazı tepsi gibi düz tutun.</p>
         <button id="start-btn">OYUNA BAŞLA</button>
     </div>
 
@@ -143,18 +143,15 @@
         const requiredHoverTime = 1000; // 1 saniye (ms)
 
         // Alt seçeneklerin Canvas üzerindeki sanal izdüşüm koordinatları
-        // İmleç canvas içinde kalacağı için seçenekleri canvas'ın en altına hayali olarak yerleştiriyoruz.
-        // Canvas alt alanı (y: 260'tan sonrası) seçenek algılama bölgesi olacak.
         const optionZones = [
-            { id: 0, xStart: 10,  xEnd: 110, yStart: 260, yEnd: 350 },
-            { id: 1, xStart: 130, xEnd: 230, yStart: 260, yEnd: 350 },
-            { id: 2, xStart: 250, xEnd: 350, yStart: 260, yEnd: 350 }
+            { id: 0, xStart: 10,  xEnd: 110, yStart: 260, yEnd: 370 },
+            { id: 1, xStart: 130, xEnd: 230, yStart: 260, yEnd: 370 },
+            { id: 2, xStart: 250, xEnd: 350, yStart: 260, yEnd: 370 }
         ];
 
         // 1. Oyunu Başlatma ve İzin İşlemleri
         startBtn.addEventListener('click', async () => {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                // iOS cihazlar için izin mekanizması
                 try {
                     const permissionState = await DeviceOrientationEvent.requestPermission();
                     if (permissionState === 'granted') {
@@ -166,7 +163,6 @@
                     console.error(error);
                 }
             } else {
-                // Android veya iOS olmayan cihazlar
                 initGame();
             }
         });
@@ -180,19 +176,15 @@
 
         // 2. Jiroskop Verisini Yakalama
         function handleOrientation(event) {
-            // beta: Ön-arka eğim (-180, 180) -> Y ekseni
-            // gamma: Sağ-sol eğim (-90, 90) -> X ekseni
             let tiltX = event.gamma; 
-            let tiltY = event.beta - 45; // Cihazı genelde 45 derece dik tutulduğu varsayımıyla kalibre ediyoruz
+            let tiltY = event.beta; // 45 derece kalibrasyonu kaldırılarak tepsi gibi düz tutuşa uyarlandı
 
-            // Hassasiyet sınırlandırması
             cursor.vx += tiltX * cursor.speedMultiplier * 0.1;
             cursor.vy += tiltY * cursor.speedMultiplier * 0.1;
         }
 
         // 3. Yeni Bölüm Oluşturma (Renk Kombinasyonları)
         function getRandomColors() {
-            // Rastgele 4 renk seçer
             let roundColors = [];
             for(let i=0; i<4; i++) {
                 roundColors.push(colors[Math.floor(Math.random() * colors.length)]);
@@ -201,18 +193,15 @@
         }
 
         function generateNewRound() {
-            // Hedef kareyi oluştur
             targetColors = getRandomColors();
             correctOptionIndex = Math.floor(Math.random() * 3);
             optionsData = [];
 
-            // 3 Seçeneği doldur
             for (let i = 0; i < 3; i++) {
                 if (i === correctOptionIndex) {
-                    optionsData.push([...targetColors]); // Doğru şık
+                    optionsData.push([...targetColors]);
                 } else {
                     let wrongColors = getRandomColors();
-                    // Yanlış şıkkın aynısı gelmesin diye küçük bir kontrol
                     while(JSON.stringify(wrongColors) === JSON.stringify(targetColors)) {
                         wrongColors = getRandomColors();
                     }
@@ -220,11 +209,10 @@
                 }
             }
 
-            // Alt kısımdaki HTML DOM kartlarını boya
             for (let i = 0; i < 3; i++) {
                 const card = document.getElementById(`opt${i}`);
-                card.innerHTML = ''; // temizle
-                card.style.borderColor = '#444'; // Seçim çizgisini sıfırla
+                card.innerHTML = '';
+                card.style.borderColor = '#444';
                 
                 optionsData[i].forEach(color => {
                     const div = document.createElement('div');
@@ -233,16 +221,15 @@
                 });
             }
 
-            // İmleci Canvas'ın ortasına sıfırla
             cursor.x = canvas.width / 2;
-            cursor.y = 100; // Üst kareye yakın başlasın
+            cursor.y = 100;
             cursor.vx = 0;
             cursor.vy = 0;
             hoveredOptionIndex = -1;
             hoverStartTime = null;
         }
 
-        // 4. Çarpışma Testi (İmleç Alttaki Seçeneklerin Üzerinde mi?)
+        // 4. Çarpışma Testi
         function checkCollision() {
             let insideAnyZone = false;
 
@@ -253,18 +240,13 @@
                     insideAnyZone = true;
 
                     if (hoveredOptionIndex !== zone.id) {
-                        // Yeni bir seçeneğin üzerine gelindi
                         hoveredOptionIndex = zone.id;
                         hoverStartTime = Date.now();
                     } else {
-                        // Zaten bu seçeneğin üzerindeydi, süreyi kontrol et
                         let elapsed = Date.now() - hoverStartTime;
-                        
-                        // Görsel efekt olarak kartın çerçevesini yeşile doğru boyayalım (Feedback)
                         document.getElementById(`opt${zone.id}`).style.borderColor = '#f1c40f';
 
                         if (elapsed >= requiredHoverTime) {
-                            // 1 saniye doldu! Seçimi kontrol et.
                             processSelection(zone.id);
                         }
                     }
@@ -273,7 +255,6 @@
             }
 
             if (!insideAnyZone) {
-                // Eğer hiçbir seçeneğin üzerinde değilse timer'ları temizle
                 if (hoveredOptionIndex !== -1) {
                     document.getElementById(`opt${hoveredOptionIndex}`).style.borderColor = '#444';
                 }
@@ -287,62 +268,49 @@
             if (selectedIndex === correctOptionIndex) {
                 score++;
                 scoreEl.innerText = score;
-                // Doğru bildi efekti
                 document.getElementById(`opt${selectedIndex}`).style.borderColor = '#2ecc71';
             } else {
-                // Yanlış bildi efekti
                 document.getElementById(`opt${selectedIndex}`).style.borderColor = '#e74c3c';
                 if(score > 0) score--;
                 scoreEl.innerText = score;
             }
 
-            // Kısa bir gecikmeyle yeni tura geç
             setTimeout(() => {
                 generateNewRound();
             }, 300);
         }
 
-        // 6. Ana Oyun Döngüsü (Render & Update)
+        // 6. Ana Oyun Döngüsü
         function gameLoop() {
-            // Fizik Güncellemeleri (Hız ve Sürtünme)
             cursor.vx *= cursor.friction;
             cursor.vy *= cursor.friction;
             cursor.x += cursor.vx;
             cursor.y += cursor.vy;
 
-            // Ekran Sınırları Kontrolü (Canvas dışına taşmasın)
             if (cursor.x - cursor.radius < 0) { cursor.x = cursor.radius; cursor.vx = 0; }
             if (cursor.x + cursor.radius > canvas.width) { cursor.x = canvas.width - cursor.radius; cursor.vx = 0; }
             if (cursor.y - cursor.radius < 0) { cursor.y = cursor.radius; cursor.vy = 0; }
             if (cursor.y + cursor.radius > canvas.height) { cursor.y = canvas.height - cursor.radius; cursor.vy = 0; }
 
-            // Çarpışma Kontrolü
             checkCollision();
 
-            // --- ÇİZİM AŞAMASI ---
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Üstteki Büyük Kareyi Çiz (4 Eşit Parça)
             const size = 180;
             const startX = (canvas.width - size) / 2;
             const startY = 20;
 
             if (targetColors.length === 4) {
-                // Sol Üst
                 ctx.fillStyle = targetColors[0];
                 ctx.fillRect(startX, startY, size/2, size/2);
-                // Sağ Üst
                 ctx.fillStyle = targetColors[1];
                 ctx.fillRect(startX + size/2, startY, size/2, size/2);
-                // Sol Alt
                 ctx.fillStyle = targetColors[2];
                 ctx.fillRect(startX, startY + size/2, size/2, size/2);
-                // Sağ Alt
                 ctx.fillStyle = targetColors[3];
                 ctx.fillRect(startX + size/2, startY + size/2, size/2, size/2);
             }
 
-            // Ortadaki Ayırıcı Artı (+) Çizgisi
             ctx.strokeStyle = '#1a1a1a';
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -352,14 +320,12 @@
             ctx.lineTo(startX + size, startY + size/2);
             ctx.stroke();
 
-            // 2. Sanal Hedef Alan Çizgileri (Geliştirici/Oyuncu için Canvas üzerindeki buton alanları rehberi)
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.lineWidth = 1;
             optionZones.forEach(zone => {
                 ctx.strokeRect(zone.xStart, zone.yStart, zone.xEnd - zone.xStart, zone.yEnd - zone.yStart);
             });
 
-            // 3. İmleci (Cursor) Çiz
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#ffffff';
             ctx.fillStyle = '#ffffff';
@@ -367,10 +333,8 @@
             ctx.arc(cursor.x, cursor.y, cursor.radius, 0, Math.PI * 2);
             ctx.fill();
             
-            // Gölge efektini sonraki çizimler için sıfırla
             ctx.shadowBlur = 0;
 
-            // 4. Hover Yüklenme Halkası (1 sn kalma efektini imleç etrafında gösterelim)
             if (hoveredOptionIndex !== -1 && hoverStartTime !== null) {
                 let elapsed = Date.now() - hoverStartTime;
                 let angle = (elapsed / requiredHoverTime) * Math.PI * 2;
