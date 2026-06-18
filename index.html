@@ -2,93 +2,179 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VR Oyun - Adım 2: Bakış Mekanizması (Düzeltildi)</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VR Oyun - Adım 2 (Kesin Çözüm)</title>
     <style>
-        /* Tarayıcıyı uyandırmak ve odaklamak için başlangıç ekranı */
-        #vr-start-screen {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #111; color: white; z-index: 99999;
+        /* Tüm ekranı kaplayan temel temizlik */
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #2C3E50; font-family: sans-serif; }
+
+        /* Başlatma Ekranı */
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; color: white; z-index: 9999;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            font-family: Arial, sans-serif; text-align: center;
         }
-        #start-button {
+        #start-btn {
             padding: 15px 30px; font-size: 18px; background: #27ae60;
             color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 15px;
         }
+
+        /* VR Box için Ekranı İkiye Bölme (Sol ve Sağ Göz) */
+        .vr-mode { display: flex; width: 100%; height: 100%; }
+        .eye-screen {
+            position: relative; width: 50%; height: 100%;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            display: flex; flex-direction: column; justify-content: space-around; align-items: center;
+            padding: 40px 0;
+        }
+
+        /* VR Box Ortasındaki Bakış İmleci (Crosshair) */
+        .cursor {
+            position: absolute; top: 50%; left: 50%;
+            width: 10px; height: 10px; background: white;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            z-index: 100; pointer-events: none; box-shadow: 0 0 5px #000;
+            transition: transform 1s linear;
+        }
+        /* Bakarken küçülme efekti */
+        .cursor.fusing { transform: translate(-50%, -50%) scale(0.2); background: #ff3333; }
+
+        /* Oyun Alanı Tasarımı (Karelerin Kutusu) */
+        .matrix-container {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            width: 140px; height: 140px; background: #222; padding: 5px; gap: 5px;
+            border-radius: 8px; transition: background 0.3s;
+        }
+        .small-square { border-radius: 3px; }
+
+        /* Referans Kare (Yukarıdaki) */
+        .reference-box { transform: scale(1.1); border: 3px solid #fff; }
+
+        /* Seçenekler Grubu (Aşağıdaki 3 adet) */
+        .options-group { display: flex; gap: 15px; justify-content: center; width: 100%; }
+        .option-box { transform: scale(0.8); cursor: pointer; }
+
+        /* Renk Tanımlamaları */
+        .c-red { background: #FF0000; }
+        .c-green { background: #00FF00; }
+        .c-yellow { background: #FFFF00; }
+        .c-blue { background: #0000FF; }
     </style>
 </head>
 <body>
 
-    <div id="vr-start-screen">
-        <h2>VR Bakış Testi</h2>
-        <p>Bakış algılamasını aktifleştirmek için lütfen butona basın.</p>
-        <button id="start-button">BAŞLAT VE EKRANA DOKUN</button>
+    <div id="start-screen">
+        <h2>VR Renk Oyunu - Adım 2</h2>
+        <p>Kareleri görmek ve oyunu başlatmak için tıklayın.</p>
+        <button id="start-btn">OYUNU BAŞLAT</button>
     </div>
 
-    <a-scene>
-        <a-entity camera look-controls position="0 1.6 0" raycaster="objects: .clickable">
-            <a-cursor id="cursor" 
-                      color="#000000"
-                      fuse="true" 
-                      fuse-timeout="1000"
-                      animation__fusing="property: scale; startEvents: fusing; easing: easeInCasing; dur: 1000; from: 1 1 1; to: 0.1 0.1 0.1"
-                      animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCasing; dur: 150; to: 1 1 1">
-            </a-cursor>
-        </a-entity>
+    <div class="vr-mode">
+        
+        <div class="eye-screen" id="left-eye">
+            <div class="cursor" id="cursor-left"></div>
+            
+            <div class="matrix-container reference-box">
+                <div class="small-square c-red"></div>
+                <div class="small-square c-green"></div>
+                <div class="small-square c-yellow"></div>
+                <div class="small-square c-blue"></div>
+            </div>
 
-        <a-entity id="reference-panel" position="0 2.5 -3" scale="0.8 0.8 0.8">
-            <a-plane width="2.2" height="2.2" color="#222"></a-plane>
-            <a-plane id="ref-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FF0000"></a-plane>
-            <a-plane id="ref-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#00FF00"></a-plane>
-            <a-plane id="ref-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FFFF00"></a-plane>
-            <a-plane id="ref-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#0000FF"></a-plane>
-        </a-entity>
+            <div class="options-group">
+                <div class="matrix-container option-box" data-index="0">
+                    <div class="small-square c-green"></div><div class="small-square c-red"></div>
+                    <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
+                </div>
+                <div class="matrix-container option-box" data-index="1">
+                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                </div>
+                <div class="matrix-container option-box" data-index="2">
+                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                </div>
+            </div>
+        </div>
 
-        <a-entity id="option-0" position="-1.8 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane id="bg-0" class="clickable" width="2.2" height="2.2" color="#111"></a-plane>
-            <a-plane id="opt-0-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#00FF00"></a-plane>
-            <a-plane id="opt-0-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#FF0000"></a-plane>
-            <a-plane id="opt-0-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#0000FF"></a-plane>
-            <a-plane id="opt-0-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#FFFF00"></a-plane>
-        </a-entity>
+        <div class="eye-screen" id="right-eye">
+            <div class="cursor" id="cursor-right"></div>
+            
+            <div class="matrix-container reference-box">
+                <div class="small-square c-red"></div>
+                <div class="small-square c-green"></div>
+                <div class="small-square c-yellow"></div>
+                <div class="small-square c-blue"></div>
+            </div>
 
-        <a-entity id="option-1" position="0 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane id="bg-1" class="clickable" width="2.2" height="2.2" color="#111"></a-plane>
-            <a-plane id="opt-1-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FF0000"></a-plane>
-            <a-plane id="opt-1-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#00FF00"></a-plane>
-            <a-plane id="opt-1-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FFFF00"></a-plane>
-            <a-plane id="opt-1-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#0000FF"></a-plane>
-        </a-entity>
+            <div class="options-group">
+                <div class="matrix-container option-box" data-index="0">
+                    <div class="small-square c-green"></div><div class="small-square c-red"></div>
+                    <div class="small-square c-blue"></div><div class="small-square c-yellow"></div>
+                </div>
+                <div class="matrix-container option-box" data-index="1">
+                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                </div>
+                <div class="matrix-container option-box" data-index="2">
+                    <div class="small-square c-yellow"></div><div class="small-square c-blue"></div>
+                    <div class="small-square c-red"></div><div class="small-square c-green"></div>
+                </div>
+            </div>
+        </div>
 
-        <a-entity id="option-2" position="1.8 0.8 -3" scale="0.6 0.6 0.6">
-            <a-plane id="bg-2" class="clickable" width="2.2" height="2.2" color="#111"></a-plane>
-            <a-plane id="opt-2-0" width="0.9" height="0.9" position="-0.5  0.5 0.01" color="#FFFF00"></a-plane>
-            <a-plane id="opt-2-1" width="0.9" height="0.9" position=" 0.5  0.5 0.01" color="#0000FF"></a-plane>
-            <a-plane id="opt-2-2" width="0.9" height="0.9" position="-0.5 -0.5 0.01" color="#FF0000"></a-plane>
-            <a-plane id="opt-2-3" width="0.9" height="0.9" position=" 0.5 -0.5 0.01" color="#00FF00"></a-plane>
-        </a-entity>
-
-        <a-sky color="#34495E"></a-sky>
-        <a-plane position="0 0 0" rotation="-90 0 0" width="50" height="50" color="#2C3E50"></a-plane>
-    </a-scene>
+    </div>
 
     <script>
-        // Başlangıç ekranındaki butona basınca sahneyi ve tarayıcıyı uyandırıyoruz
-        document.getElementById('start-button').addEventListener('click', function() {
-            document.getElementById('vr-start-screen').style.display = 'none';
-            
-            // Dinleyicileri buton tıklandıktan sonra güvenli şekilde bağlıyoruz
-            for (let i = 0; i < 3; i++) {
-                document.getElementById(`bg-${i}`).addEventListener('click', function () {
-                    // Algılama başarılıysa arka plan beyaz olur
-                    this.setAttribute('color', '#FFFFFF');
-                });
-            }
-        });
-    </script>
+        let fuseTimer = null;
+        const leftCursor = document.getElementById('cursor-left');
+        const rightCursor = document.getElementById('cursor-right');
 
+        document.getElementById('start-btn').addEventListener('click', function() {
+            document.getElementById('start-screen').style.display = 'none';
+            // Telefon yatay çevrildiğinde tam ekran yapmak için (opsiyonel)
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            }
+            setupGazeEvents();
+        });
+
+        function setupGazeEvents() {
+            // Aşağıdaki 3 seçeneği buluyoruz (Hem sol hem sağ gözdekileri eşzamanlı yöneteceğiz)
+            const optionBoxes = document.querySelectorAll('.option-box');
+
+            optionBoxes.forEach(box => {
+                // VR Box'ta kafayı çevirip imleci kutunun üzerine getirdiğimiz an (Mouseenter mobilde bakış simülasyonudur)
+                box.addEventListener('mouseenter', function() {
+                    const targetIndex = this.getAttribute('data-index');
+                    
+                    // İmleçlerin küçülme animasyonunu başlat (1 saniye sürecek)
+                    leftCursor.classList.add('fusing');
+                    rightCursor.classList.add('fusing');
+
+                    // 1 saniye (1000ms) boyunca odaklanılırsa seçimi gerçekleştir
+                    fuseTimer = setTimeout(() => {
+                        // Seçilen kutunun arka planını BEYAZ yap (Hem sol hem sağ ekranda)
+                        const identicalBoxes = document.querySelectorAll(`.option-box[data-index="${targetIndex}"]`);
+                        identicalBoxes.forEach(b => b.style.backgroundColor = '#FFFFFF');
+                        
+                        resetCursors();
+                    }, 1000);
+                });
+
+                // Kafayı kutudan başka yere çevirirse işlemi iptal et
+                box.addEventListener('mouseleave', function() {
+                    clearTimeout(fuseTimer);
+                    resetCursors();
+                });
+            });
+        }
+
+        function resetCursors() {
+            leftCursor.classList.remove('fusing');
+            rightCursor.classList.remove('fusing');
+        }
+    </script>
 </body>
 </html>
