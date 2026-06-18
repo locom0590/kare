@@ -3,578 +3,387 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>VR Gaze Game - Safari Calibrated</title>
+    <title>Jiroskop Renk Eşleştirme Oyunu</title>
     <style>
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
+        body {
             margin: 0;
             padding: 0;
-        }
-        body, html {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            font-family: sans-serif;
-        }
-
-        /* Başlatma Ekranı */
-        #start-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #111;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            z-index: 9999;
-            color: #fff;
+            justify-content: space-between;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        #start-btn {
-            padding: 20px 40px;
+
+        #score-board {
             font-size: 24px;
             font-weight: bold;
-            background: #25d366;
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+        }
+
+        /* Oyun Alanı (Canvas) */
+        canvas {
+            background-color: #222;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 15px;
+            max-width: 90vw;
+            max-height: 45vh;
+        }
+
+        /* Seçenekler Alanı */
+        #options-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 30px;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+
+        .option-card {
+            width: 28%;
+            aspect-ratio: 1;
+            border: 4px solid #444;
+            border-radius: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            overflow: hidden;
+            box-sizing: border-box;
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+        }
+
+        /* İzin ve Başlangıç Ekranı Overlayer */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #2ecc71;
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: 30px;
             cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,250,0,0.3);
-        }
-
-        /* VR Düzeni */
-        #vr-container {
-            display: flex;
-            width: 100vw;
-            height: 100vh;
-            visibility: hidden;
-        }
-        .eye-view {
-            position: relative;
-            width: 50vw;
-            height: 100vh;
-            overflow: hidden;
-            background: #1a1a1a;
-        }
-        #left-eye {
-            border-right: 2px solid #000;
-        }
-
-        /* Sabit Crosshair */
-        .crosshair-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            z-index: 100;
-            pointer-events: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .crosshair-dot {
-            width: 6px;
-            height: 6px;
-            background: #fff;
-            border-radius: 50%;
-            position: absolute;
-        }
-        .crosshair-circle {
-            width: 30px;
-            height: 30px;
-            border: 2px solid rgba(255, 255, 255, 0.6);
-            border-radius: 50%;
-            transition: transform 0.1s linear, border-color 0.2s;
-        }
-        .crosshair-circle.charging {
-            transform: scale(0.4);
-            border-color: #ffeb3b;
-        }
-
-        /* Hareketli Dünya */
-        .scene {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-around;
-            align-items: center;
-            padding: 30px 10px;
-            will-change: transform;
-        }
-
-        /* Matris Yapısı */
-        .matrix-container {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            grid-template-rows: repeat(2, 1fr);
-            width: 110px;
-            height: 110px;
-            border: 3px solid #fff;
-            background: #333;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-        .sub-square {
-            width: 100%;
-            height: 100%;
-            border: 1px solid rgba(0, 0, 0, 0.25);
-        }
-
-        .reference-zone {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
-        .level-text {
-            color: #fff;
-            font-size: 18px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px #000;
-        }
-
-        .options-zone {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            width: 100%;
-        }
-        .option-wrapper {
-            position: relative;
-        }
-
-        .feedback-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 52px;
-            font-weight: bold;
-            border-radius: 4px;
-            opacity: 0;
-            transition: opacity 0.15s ease;
-            pointer-events: none;
-        }
-        .feedback-overlay.wrong {
-            background: rgba(255, 0, 0, 0.75);
-            color: #fff;
-            opacity: 1;
-        }
-        .feedback-overlay.correct {
-            background: rgba(0, 255, 0, 0.75);
-            color: #fff;
-            opacity: 1;
+            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4);
         }
     </style>
 </head>
 <body>
 
-    <div id="start-overlay">
-        <h2 style="margin-bottom: 15px; text-align: center;">VR Gaze Matching Game</h2>
-        <p style="margin-bottom: 25px; color: #ccc; text-align: center; max-width: 85%; font-size: 14px;">
-            Lütfen cihazınızı <b>YATAY (Landscape)</b> konuma getirin ve ardından başlat butonuna basın.
-        </p>
-        <button id="start-btn">BAŞLAT</button>
+    <div id="score-board">Skor: <span id="score">0</span></div>
+
+    <canvas id="gameCanvas" width="360" height="360"></canvas>
+
+    <div id="options-container">
+        <div class="option-card" id="opt0" data-index="0"></div>
+        <div class="option-card" id="opt1" data-index="1"></div>
+        <div class="option-card" id="opt2" data-index="2"></div>
     </div>
 
-    <div id="vr-container">
-        <div class="eye-view" id="left-eye">
-            <div class="crosshair-container" id="left-crosshair-anchor">
-                <div class="crosshair-dot"></div>
-                <div class="crosshair-circle" id="left-circle"></div>
-            </div>
-            <div class="scene" id="left-scene"></div>
-        </div>
-
-        <div class="eye-view" id="right-eye">
-            <div class="crosshair-container" id="right-crosshair-anchor">
-                <div class="crosshair-dot"></div>
-                <div class="crosshair-circle" id="right-circle"></div>
-            </div>
-            <div class="scene" id="right-scene"></div>
-        </div>
+    <div id="start-overlay">
+        <h2>Jiroskop Eşleştirme Oyunu</h2>
+        <p>Oyunu oynamak için telefonunuzu eğmeniz gerekir. Lütfen jiroskop izni verin ve cihazı dik tutun.</p>
+        <button id="start-btn">OYUNA BAŞLA</button>
     </div>
 
     <script>
-        // --- Oyun Durumu ---
-        let gameState = {
-            level: 1,
-            colors: ['red', 'green'],
-            referenceMatrix: [],
-            options: [],
-            correctIndex: -1,
-            wrongSelections: [false, false, false],
-            isRoundTransitioning: false
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        // Renk Havuzu
+        const colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3', '#33FFF0'];
+
+        // Oyun Durumu (State)
+        let score = 0;
+        let targetColors = []; // Üstteki karenin 4 rengi [sol-üst, sağ-üst, sol-alt, sağ-alt]
+        let optionsData = [];  // 3 seçeneğin renk kombinasyonları
+        let correctOptionIndex = 0;
+
+        // İmleç (Cursor) Fizikleri
+        let cursor = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 12,
+            vx: 0,
+            vy: 0,
+            speedMultiplier: 0.6, // Jiroskop hassasiyeti
+            friction: 0.92        // Akıcılık (Sürtünme)
         };
 
-        // --- Safari İçin Optimize Edilmiş Filtre Motoru ---
-        let currentX = 0, currentY = 0;   
-        let targetX = 0, targetY = 0;     
-        
-        // Sarsıntıyı engellemek için filtreyi daha da derinleştirdik (0.12 -> 0.07)
-        const LERP_FACTOR = 0.07; 
-        const CLAMP_VAL = 100;     
+        // Zamanlayıcı Kontrolleri (1 saniye kalma mekaniği)
+        let hoveredOptionIndex = -1;
+        let hoverStartTime = null;
+        const requiredHoverTime = 1000; // 1 saniye (ms)
 
-        let lastBeta = null;
-        let lastGamma = null;
+        // Alt seçeneklerin Canvas üzerindeki sanal izdüşüm koordinatları
+        // İmleç canvas içinde kalacağı için seçenekleri canvas'ın en altına hayali olarak yerleştiriyoruz.
+        // Canvas alt alanı (y: 260'tan sonrası) seçenek algılama bölgesi olacak.
+        const optionZones = [
+            { id: 0, xStart: 10,  xEnd: 110, yStart: 260, yEnd: 350 },
+            { id: 1, xStart: 130, xEnd: 230, yStart: 260, yEnd: 350 },
+            { id: 2, xStart: 250, xEnd: 350, yStart: 260, yEnd: 350 }
+        ];
 
-        // --- Gaze Kontrolü ---
-        let gazeTargetIndex = -1;
-        let gazeTimer = null;
-        const GAZE_DURATION = 1000; 
-
-        // --- Web Audio API Sentezleyici ---
-        let audioCtx = null;
-        function initAudio() {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        function playSound(type) {
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            if (type === 'correct') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(783.99, audioCtx.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.3);
-            } else if (type === 'wrong') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(130.81, audioCtx.currentTime);
-                osc.frequency.linearRampToValueAtTime(90, audioCtx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.25);
-            }
-        }
-
-        // --- Başlatıcı ve İzin Mekanizması ---
-        const startBtn = document.getElementById('start-btn');
-        const startOverlay = document.getElementById('start-overlay');
-        const vrContainer = document.getElementById('vr-container');
-
-        startBtn.addEventListener('click', () => {
-            initAudio();
-            initLevelPool();
-            generateLevel();
-
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen();
-            } else if (document.documentElement.webkitRequestFullscreen) {
-                document.documentElement.webkitRequestFullscreen();
-            }
-
+        // 1. Oyunu Başlatma ve İzin İşlemleri
+        startBtn.addEventListener('click', async () => {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(permissionState => {
-                        if (permissionState === 'granted') {
-                            window.addEventListener('deviceorientation', handleSafariCalibratedOrientation, true);
-                        } else {
-                            alert('Sensör izni reddedildi.');
-                        }
-                    })
-                    .catch(console.error);
+                // iOS cihazlar için izin mekanizması
+                try {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        initGame();
+                    } else {
+                        alert('Jiroskop izni reddedildi. Oyun oynanamaz.');
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
             } else {
-                window.addEventListener('deviceorientation', handleSafariCalibratedOrientation, true);
+                // Android veya iOS olmayan cihazlar
+                initGame();
             }
-
-            startOverlay.style.display = 'none';
-            vrContainer.style.visibility = 'visible';
-            requestAnimationFrame(updateSceneLoop);
         });
 
-        // --- Safari Uyumlu Eksen ve Yön Koruyucu Motor ---
-        function handleSafariCalibratedOrientation(event) {
-            let beta = event.beta;   
-            let gamma = event.gamma; 
-
-            if (beta === null || gamma === null) return;
-
-            if (lastBeta === null || lastGamma === null) {
-                lastBeta = beta;
-                lastGamma = gamma;
-                return;
-            }
-
-            // Anlık değişim miktarı (Delta)
-            let dBeta = beta - lastBeta;
-            let dGamma = gamma - lastGamma;
-
-            // Safari trigonometrik kırılma koruması (Aşırı sıçramaları yakalayıp nötrleme)
-            if (Math.abs(dBeta) > 100) dBeta = 0;
-            if (Math.abs(dGamma) > 50) dGamma = 0;
-
-            let orientationAngle = window.orientation || (screen.orientation && screen.orientation.angle) || 0;
-
-            // Hassasiyeti çarpanı düşürüldü (4.5 -> 1.8) ve yön kilitlendi
-            const SENSITIVITY = 1.8; 
-
-            if (orientationAngle === 90) {
-                // Sağ yatay tutuşta Safari eksen eşlemesi
-                targetX += dBeta * SENSITIVITY;
-                targetY += dGamma * SENSITIVITY;
-            } else if (orientationAngle === -90 || orientationAngle === 270) {
-                // Sol yatay tutuşta Safari eksen eşlemesi
-                targetX -= dBeta * SENSITIVITY;
-                targetY -= dGamma * SENSITIVITY;
-            } else {
-                targetX += dGamma * SENSITIVITY;
-                targetY += dBeta * SENSITIVITY;
-            }
-
-            // Küplerin ekrandan kaçma sınır kontrolü
-            targetX = Math.max(-CLAMP_VAL, Math.min(CLAMP_VAL, targetX));
-            targetY = Math.max(-CLAMP_VAL, Math.min(CLAMP_VAL, targetY));
-
-            lastBeta = beta;
-            lastGamma = gamma;
+        function initGame() {
+            startOverlay.style.display = 'none';
+            window.addEventListener('deviceorientation', handleOrientation);
+            generateNewRound();
+            requestAnimationFrame(gameLoop);
         }
 
-        // --- Akıcı Render Döngüsü ---
-        function updateSceneLoop() {
-            currentX += (targetX - currentX) * LERP_FACTOR;
-            currentY += (targetY - currentY) * LERP_FACTOR;
+        // 2. Jiroskop Verisini Yakalama
+        function handleOrientation(event) {
+            // beta: Ön-arka eğim (-180, 180) -> Y ekseni
+            // gamma: Sağ-sol eğim (-90, 90) -> X ekseni
+            let tiltX = event.gamma; 
+            let tiltY = event.beta - 45; // Cihazı genelde 45 derece dik tutulduğu varsayımıyla kalibre ediyoruz
 
-            const leftScene = document.getElementById('left-scene');
-            const rightScene = document.getElementById('right-scene');
-
-            if (leftScene && rightScene) {
-                // Kafayı sağa çevirince dünya sola gitmeli (Doğal VR Etkisi)
-                const transformStr = `translate(${-currentX}px, ${-currentY}px)`;
-                leftScene.style.transform = transformStr;
-                rightScene.style.transform = transformStr;
-            }
-
-            checkGazeRaycast();
-            requestAnimationFrame(updateSceneLoop);
+            // Hassasiyet sınırlandırması
+            cursor.vx += tiltX * cursor.speedMultiplier * 0.1;
+            cursor.vy += tiltY * cursor.speedMultiplier * 0.1;
         }
 
-        // --- Geliştirilmiş Dinamik Raycast Motoru (Seçim Problemi Çözümü) ---
-        function checkGazeRaycast() {
-            if (gameState.isRoundTransitioning) return;
+        // 3. Yeni Bölüm Oluşturma (Renk Kombinasyonları)
+        function getRandomColors() {
+            // Rastgele 4 renk seçer
+            let roundColors = [];
+            for(let i=0; i<4; i++) {
+                roundColors.push(colors[Math.floor(Math.random() * colors.length)]);
+            }
+            return roundColors;
+        }
 
-            // İmleçlerin ekrandaki güncel fiziksel merkez noktaları
-            const leftAnchor = document.getElementById('left-crosshair-anchor').getBoundingClientRect();
-            const rightAnchor = document.getElementById('right-crosshair-anchor').getBoundingClientRect();
+        function generateNewRound() {
+            // Hedef kareyi oluştur
+            targetColors = getRandomColors();
+            correctOptionIndex = Math.floor(Math.random() * 3);
+            optionsData = [];
 
-            const leftOptions = document.querySelectorAll('#left-scene .option-wrapper');
-            const rightOptions = document.querySelectorAll('#right-scene .option-wrapper');
-
-            let detectedIndex = -1;
-            
-            // Çarpışma hassasiyeti için tolerans payı (piksel genişletme)
-            const TOLERANCE = 5;
-
-            // Sol göz taraması
-            leftOptions.forEach(el => {
-                const rect = el.getBoundingClientRect();
-                if (leftAnchor.left + 20 >= (rect.left - TOLERANCE) && leftAnchor.left - 20 <= (rect.right + TOLERANCE) &&
-                    leftAnchor.top + 20 >= (rect.top - TOLERANCE) && leftAnchor.top - 20 <= (rect.bottom + TOLERANCE)) {
-                    detectedIndex = parseInt(el.getAttribute('data-index'));
-                }
-            });
-
-            // Sağ göz taraması
-            if (detectedIndex === -1) {
-                rightOptions.forEach(el => {
-                    const rect = el.getBoundingClientRect();
-                    if (rightAnchor.left + 20 >= (rect.left - TOLERANCE) && rightAnchor.left - 20 <= (rect.right + TOLERANCE) &&
-                        rightAnchor.top + 20 >= (rect.top - TOLERANCE) && rightAnchor.top - 20 <= (rect.bottom + TOLERANCE)) {
-                        detectedIndex = parseInt(el.getAttribute('data-index'));
+            // 3 Seçeneği doldur
+            for (let i = 0; i < 3; i++) {
+                if (i === correctOptionIndex) {
+                    optionsData.push([...targetColors]); // Doğru şık
+                } else {
+                    let wrongColors = getRandomColors();
+                    // Yanlış şıkkın aynısı gelmesin diye küçük bir kontrol
+                    while(JSON.stringify(wrongColors) === JSON.stringify(targetColors)) {
+                        wrongColors = getRandomColors();
                     }
+                    optionsData.push(wrongColors);
+                }
+            }
+
+            // Alt kısımdaki HTML DOM kartlarını boya
+            for (let i = 0; i < 3; i++) {
+                const card = document.getElementById(`opt${i}`);
+                card.innerHTML = ''; // temizle
+                card.style.borderColor = '#444'; // Seçim çizgisini sıfırla
+                
+                optionsData[i].forEach(color => {
+                    const div = document.createElement('div');
+                    div.style.backgroundColor = color;
+                    card.appendChild(div);
                 });
             }
 
-            if (detectedIndex !== -1 && !gameState.wrongSelections[detectedIndex]) {
-                if (gazeTargetIndex !== detectedIndex) {
-                    gazeTargetIndex = detectedIndex;
-                    startGazeCharging();
+            // İmleci Canvas'ın ortasına sıfırla
+            cursor.x = canvas.width / 2;
+            cursor.y = 100; // Üst kareye yakın başlasın
+            cursor.vx = 0;
+            cursor.vy = 0;
+            hoveredOptionIndex = -1;
+            hoverStartTime = null;
+        }
+
+        // 4. Çarpışma Testi (İmleç Alttaki Seçeneklerin Üzerinde mi?)
+        function checkCollision() {
+            let insideAnyZone = false;
+
+            for (let zone of optionZones) {
+                if (cursor.x >= zone.xStart && cursor.x <= zone.xEnd &&
+                    cursor.y >= zone.yStart && cursor.y <= zone.yEnd) {
+                    
+                    insideAnyZone = true;
+
+                    if (hoveredOptionIndex !== zone.id) {
+                        // Yeni bir seçeneğin üzerine gelindi
+                        hoveredOptionIndex = zone.id;
+                        hoverStartTime = Date.now();
+                    } else {
+                        // Zaten bu seçeneğin üzerindeydi, süreyi kontrol et
+                        let elapsed = Date.now() - hoverStartTime;
+                        
+                        // Görsel efekt olarak kartın çerçevesini yeşile doğru boyayalım (Feedback)
+                        document.getElementById(`opt${zone.id}`).style.borderColor = '#f1c40f';
+
+                        if (elapsed >= requiredHoverTime) {
+                            // 1 saniye doldu! Seçimi kontrol et.
+                            processSelection(zone.id);
+                        }
+                    }
+                    break;
                 }
+            }
+
+            if (!insideAnyZone) {
+                // Eğer hiçbir seçeneğin üzerinde değilse timer'ları temizle
+                if (hoveredOptionIndex !== -1) {
+                    document.getElementById(`opt${hoveredOptionIndex}`).style.borderColor = '#444';
+                }
+                hoveredOptionIndex = -1;
+                hoverStartTime = null;
+            }
+        }
+
+        // 5. Seçim Doğrulama Mantığı
+        function processSelection(selectedIndex) {
+            if (selectedIndex === correctOptionIndex) {
+                score++;
+                scoreEl.innerText = score;
+                // Doğru bildi efekti
+                document.getElementById(`opt${selectedIndex}`).style.borderColor = '#2ecc71';
             } else {
-                if (gazeTargetIndex !== -1) {
-                    gazeTargetIndex = -1;
-                    cancelGazeCharging();
-                }
-            }
-        }
-
-        // --- Gaze Zamanlayıcıları ---
-        function startGazeCharging() {
-            if (gazeTimer) clearTimeout(gazeTimer);
-
-            document.getElementById('left-circle').classList.add('charging');
-            document.getElementById('right-circle').classList.add('charging');
-
-            gazeTimer = setTimeout(() => {
-                evaluateSelection(gazeTargetIndex);
-            }, GAZE_DURATION);
-        }
-
-        function cancelGazeCharging() {
-            if (gazeTimer) {
-                clearTimeout(gazeTimer);
-                gazeTimer = null;
-            }
-            document.getElementById('left-circle').classList.remove('charging');
-            document.getElementById('right-circle').classList.remove('charging');
-        }
-
-        // --- Oyun Akış Yönetimi ---
-        function initLevelPool() {
-            if (gameState.level <= 5) {
-                gameState.colors = ['red', 'green'];
-            } else if (gameState.level <= 10) {
-                gameState.colors = ['red', 'green', 'yellow'];
-            } else {
-                gameState.colors = ['red', 'green', 'yellow', 'blue'];
-            }
-        }
-
-        function generateRandomMatrix() {
-            let matrix = [];
-            for (let i = 0; i < 4; i++) {
-                const idx = Math.floor(Math.random() * gameState.colors.length);
-                matrix.push(gameState.colors[idx]);
-            }
-            return matrix;
-        }
-
-        function isMatricesEqual(m1, m2) {
-            return m1.every((v, i) => v === m2[i]);
-        }
-
-        function generateLevel() {
-            initLevelPool();
-            gameState.wrongSelections = [false, false, false];
-            gameState.isRoundTransitioning = false;
-            cancelGazeCharging();
-
-            gameState.referenceMatrix = generateRandomMatrix();
-            gameState.correctIndex = Math.floor(Math.random() * 3);
-
-            gameState.options = [];
-            for (let i = 0; i < 3; i++) {
-                if (i === gameState.correctIndex) {
-                    gameState.options.push([...gameState.referenceMatrix]);
-                } else {
-                    let wrongMatrix;
-                    do {
-                        wrongMatrix = generateRandomMatrix();
-                    } while (isMatricesEqual(wrongMatrix, gameState.referenceMatrix));
-                    gameState.options.push(wrongMatrix);
-                }
+                // Yanlış bildi efekti
+                document.getElementById(`opt${selectedIndex}`).style.borderColor = '#e74c3c';
+                if(score > 0) score--;
+                scoreEl.innerText = score;
             }
 
-            renderDOMInsideEye('left-scene');
-            renderDOMInsideEye('right-scene');
+            // Kısa bir gecikmeyle yeni tura geç
+            setTimeout(() => {
+                generateNewRound();
+            }, 300);
         }
 
-        function renderDOMInsideEye(sceneId) {
-            const sceneEl = document.getElementById(sceneId);
-            sceneEl.innerHTML = '';
+        // 6. Ana Oyun Döngüsü (Render & Update)
+        function gameLoop() {
+            // Fizik Güncellemeleri (Hız ve Sürtünme)
+            cursor.vx *= cursor.friction;
+            cursor.vy *= cursor.friction;
+            cursor.x += cursor.vx;
+            cursor.y += cursor.vy;
 
-            const refZone = document.createElement('div');
-            refZone.className = 'reference-zone';
+            // Ekran Sınırları Kontrolü (Canvas dışına taşmasın)
+            if (cursor.x - cursor.radius < 0) { cursor.x = cursor.radius; cursor.vx = 0; }
+            if (cursor.x + cursor.radius > canvas.width) { cursor.x = canvas.width - cursor.radius; cursor.vx = 0; }
+            if (cursor.y - cursor.radius < 0) { cursor.y = cursor.radius; cursor.vy = 0; }
+            if (cursor.y + cursor.radius > canvas.height) { cursor.y = canvas.height - cursor.radius; cursor.vy = 0; }
+
+            // Çarpışma Kontrolü
+            checkCollision();
+
+            // --- ÇİZİM AŞAMASI ---
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Üstteki Büyük Kareyi Çiz (4 Eşit Parça)
+            const size = 180;
+            const startX = (canvas.width - size) / 2;
+            const startY = 20;
+
+            if (targetColors.length === 4) {
+                // Sol Üst
+                ctx.fillStyle = targetColors[0];
+                ctx.fillRect(startX, startY, size/2, size/2);
+                // Sağ Üst
+                ctx.fillStyle = targetColors[1];
+                ctx.fillRect(startX + size/2, startY, size/2, size/2);
+                // Sol Alt
+                ctx.fillStyle = targetColors[2];
+                ctx.fillRect(startX, startY + size/2, size/2, size/2);
+                // Sağ Alt
+                ctx.fillStyle = targetColors[3];
+                ctx.fillRect(startX + size/2, startY + size/2, size/2, size/2);
+            }
+
+            // Ortadaki Ayırıcı Artı (+) Çizgisi
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(startX + size/2, startY);
+            ctx.lineTo(startX + size/2, startY + size);
+            ctx.moveTo(startX, startY + size/2);
+            ctx.lineTo(startX + size, startY + size/2);
+            ctx.stroke();
+
+            // 2. Sanal Hedef Alan Çizgileri (Geliştirici/Oyuncu için Canvas üzerindeki buton alanları rehberi)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            optionZones.forEach(zone => {
+                ctx.strokeRect(zone.xStart, zone.yStart, zone.xEnd - zone.xStart, zone.yEnd - zone.yStart);
+            });
+
+            // 3. İmleci (Cursor) Çiz
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(cursor.x, cursor.y, cursor.radius, 0, Math.PI * 2);
+            ctx.fill();
             
-            const lvlText = document.createElement('div');
-            lvlText.className = 'level-text';
-            lvlText.innerText = `SEVİYE: ${gameState.level}`;
-            refZone.appendChild(lvlText);
+            // Gölge efektini sonraki çizimler için sıfırla
+            ctx.shadowBlur = 0;
 
-            const refMatrixEl = createMatrixDOM(gameState.referenceMatrix);
-            refZone.appendChild(refMatrixEl);
-            sceneEl.appendChild(refZone);
-
-            const optionsZone = document.createElement('div');
-            optionsZone.className = 'options-zone';
-
-            gameState.options.forEach((matrixData, idx) => {
-                const optWrapper = document.createElement('div');
-                optWrapper.className = 'option-wrapper';
-                optWrapper.setAttribute('data-index', idx);
-
-                const matrixEl = createMatrixDOM(matrixData);
-                optWrapper.appendChild(matrixEl);
-
-                const feedbackOverlay = document.createElement('div');
-                feedbackOverlay.className = 'feedback-overlay';
-                if (gameState.wrongSelections[idx]) {
-                    feedbackOverlay.classList.add('wrong');
-                    feedbackOverlay.innerHTML = '&#10006;';
-                } else if (gameState.isRoundTransitioning && idx === gameState.correctIndex) {
-                    feedbackOverlay.classList.add('correct');
-                    feedbackOverlay.innerHTML = '&#10004;';
-                }
-                optWrapper.appendChild(feedbackOverlay);
-
-                optionsZone.appendChild(optWrapper);
-            });
-
-            sceneEl.appendChild(optionsZone);
-        }
-
-        function createMatrixDOM(matrixColors) {
-            const container = document.createElement('div');
-            container.className = 'matrix-container';
-            matrixColors.forEach(color => {
-                const subSquare = document.createElement('div');
-                subSquare.className = 'sub-square';
-                subSquare.style.backgroundColor = color;
-                container.appendChild(subSquare);
-            });
-            return container;
-        }
-
-        function evaluateSelection(index) {
-            gazeTargetIndex = -1;
-            cancelGazeCharging();
-
-            if (index === gameState.correctIndex) {
-                gameState.isRoundTransitioning = true;
-                playSound('correct');
-                renderAllEyes();
-
-                setTimeout(() => {
-                    gameState.level++;
-                    generateLevel();
-                }, 1500);
-            } else {
-                if (!gameState.wrongSelections[index]) {
-                    gameState.wrongSelections[index] = true;
-                    playSound('wrong');
-                    renderAllEyes();
-                }
+            // 4. Hover Yüklenme Halkası (1 sn kalma efektini imleç etrafında gösterelim)
+            if (hoveredOptionIndex !== -1 && hoverStartTime !== null) {
+                let elapsed = Date.now() - hoverStartTime;
+                let angle = (elapsed / requiredHoverTime) * Math.PI * 2;
+                
+                ctx.strokeStyle = '#f1c40f';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(cursor.x, cursor.y, cursor.radius + 6, -Math.PI/2, (-Math.PI/2) + angle);
+                ctx.stroke();
             }
-        }
 
-        function renderAllEyes() {
-            renderDOMInsideEye('left-scene');
-            renderDOMInsideEye('right-scene');
+            requestAnimationFrame(gameLoop);
         }
-
-        window.addEventListener('resize', () => {
-            lastBeta = null;
-            lastGamma = null;
-        });
     </script>
 </body>
 </html>
