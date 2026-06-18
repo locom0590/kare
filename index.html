@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VR Oyun - Adım 2: Jiroskop Entegrasyonu</title>
+    <title>VR Oyun - Adım 2: Akıllı Takip Sistemi</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #1a252f; font-family: sans-serif; }
 
-        /* Başlatma ve İzin Ekranı */
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #111; color: white; z-index: 9999;
@@ -21,7 +20,6 @@
             font-weight: bold;
         }
 
-        /* VR Çerçevesi */
         .vr-mode { display: flex; width: 100%; height: 100%; }
         .eye-screen {
             position: relative; width: 50%; height: 100%;
@@ -29,38 +27,40 @@
             overflow: hidden;
         }
 
-        /* Kamera Kontteyneri: Jiroskop ile bu alanı döndüreceğiz */
+        /* Kamera ve Küplerin Dünyası: Yumuşak takip için geçiş efekti ekledik */
         .camera-world {
             position: absolute; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: space-around; align-items: center;
             padding: 40px 0;
             transform-origin: center center;
             will-change: transform;
+            /* Kafanı çevirdiğinde küpler arkandan yumuşakça (0.3 saniyede) merkeze akacak */
+            transition: transform 0.3s ease-out; 
         }
 
-        /* VR Sabit İmleç (Ekrana yapışıktır, dünya dönse de tam ortada kalır) */
+        /* İmleç (Crosshair): Anlık hareket eder, yumuşatması yoktur. Böylece hedef alabilirsin. */
         .cursor {
             position: absolute; top: 50%; left: 50%;
-            width: 12px; height: 12px; background: white;
+            width: 14px; height: 14px; background: transparent;
+            border: 3px solid white;
             border-radius: 50%; transform: translate(-50%, -50%);
             z-index: 100; pointer-events: none; box-shadow: 0 0 6px #000;
-            transition: transform 1s linear, background-color 0.2s;
+            will-change: transform;
         }
-        .cursor.fusing { transform: translate(-50%, -50%) scale(0.3); background: #e74c3c; }
+        /* Bakarken imleç kırmızı bir noktaya dönüşür */
+        .cursor.fusing { background: #e74c3c; border-color: #e74c3c; transform: translate(-50%, -50%) scale(0.5); }
 
-        /* Oyun Nesneleri */
         .matrix-container {
             display: grid; grid-template-columns: repeat(2, 1fr);
-            width: 130px; height: 130px; background: #222; padding: 5px; gap: 5px;
+            width: 120px; height: 120px; background: #222; padding: 5px; gap: 5px;
             border-radius: 8px; transition: background 0.3s;
         }
         .small-square { border-radius: 3px; }
         .reference-box { transform: scale(1.1); border: 3px solid #fff; }
         
-        .options-group { display: flex; gap: 20px; justify-content: center; width: 100%; }
+        .options-group { display: flex; gap: 15px; justify-content: center; width: 100%; }
         .option-box { transform: scale(0.85); }
 
-        /* Renkler */
         .c-red { background: #FF0000; }
         .c-green { background: #00FF00; }
         .c-yellow { background: #FFFF00; }
@@ -70,13 +70,12 @@
 <body>
 
     <div id="start-screen">
-        <h2>VR Hareket Testi</h2>
-        <p>Kafanızı çevirdiğinizde oyunun algılaması için hareket sensörü (jiroskop) izni vermeniz gerekmektedir.</p>
-        <button id="start-btn">İZİN VER VE BAŞLAT</button>
+        <h2>VR Akıllı Takip Sistemi</h2>
+        <p>Küplerin her zaman tam karşınızda kalması ve yumuşakça sizi takip etmesi için başlatın.</p>
+        <button id="start-btn">BAŞLAT</button>
     </div>
 
     <div class="vr-mode">
-        
         <div class="eye-screen">
             <div class="cursor" id="cursor-left"></div>
             <div class="camera-world" id="world-left">
@@ -124,7 +123,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <script>
@@ -132,28 +130,22 @@
         let isFusing = false;
         let currentTargetIndex = null;
         
+        // İlk açılış açılarını sıfırlamak (ofsetlemek) için değişkenler
+        let initialBeta = null;
+        let initialGamma = null;
+
         const leftCursor = document.getElementById('cursor-left');
         const rightCursor = document.getElementById('cursor-right');
         const worldLeft = document.getElementById('world-left');
         const worldRight = document.getElementById('world-right');
 
         document.getElementById('start-btn').addEventListener('click', async function() {
-            // iOS için Jiroskop İzin İsteme Mekanizması
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     const permissionState = await DeviceOrientationEvent.requestPermission();
-                    if (permissionState === 'granted') {
-                        initVR();
-                    } else {
-                        alert('Jiroskop izni reddedildi. Oyun kafa hareketiyle oynanamaz.');
-                    }
-                } catch (error) {
-                    console.error(error);
-                }
-            } else {
-                // Android veya izin istemeyen düz tarayıcılar direkt başlar
-                initVR();
-            }
+                    if (permissionState === 'granted') { initVR(); }
+                } catch (error) { console.error(error); }
+            } else { initVR(); }
         });
 
         function initVR() {
@@ -161,67 +153,58 @@
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(() => {});
             }
-            
-            // Jiroskop Dinleyicisini Başlat
             window.addEventListener('deviceorientation', handleOrientation, true);
-            
-            // Döngüsel olarak imlecin hangi kutunun üstünde olduğunu kontrol eden motor
-            setInterval(checkGazeCollision, 100);
+            setInterval(checkGazeCollision, 50); // Çarpışma testini hızlandırdık (daha hassas)
         }
 
-        // Kafayı sağa sola (gamma) veya yukarı aşağı (beta) oynattıkça dünyayı ters yöne kaydırırız
         function handleOrientation(event) {
-            // Telefonun yatay tutulduğunu varsayıyoruz (VR Box modu)
-            // Cihaz eksenlerine göre kafa takibi simülasyonu
-            let xMove = 0;
-            let yMove = 0;
-
-            if (window.orientation === 90) {
-                xMove = -event.beta * 4;
-                yMove = -event.gamma * 4;
-            } else if (window.orientation === -90) {
-                xMove = event.beta * 4;
-                yMove = event.gamma * 4;
-            } else {
-                // Telefon dikse düzgün çalışması için yatay çevrilmesini isteyeceğiz ama şimdilik standart eşitleme:
-                xMove = event.gamma * 4;
-                yMove = event.beta * 4;
+            // İlk açılışta telefonun durduğu açıyı referans al (Kareler tam karşında başlasın)
+            if (initialBeta === null && event.beta !== null) {
+                initialBeta = event.beta;
+                initialGamma = event.gamma;
             }
 
-            // Dünyayı (kareleri) hareket ettirerek kameranın döndüğü hissini yaratıyoruz
-            const transformStyle = `translate(${xMove}px, ${yMove}px)`;
-            worldLeft.style.transform = transformStyle;
-            worldRight.style.transform = transformStyle;
+            let deltaX = 0;
+            let deltaY = 0;
+
+            if (window.orientation === 90 || window.orientation === -90) {
+                deltaX = (event.beta - initialBeta) * 5;
+                deltaY = (event.gamma - initialGamma) * 5;
+            } else {
+                deltaX = (event.gamma - initialGamma) * 5;
+                deltaY = (event.beta - initialBeta) * 5;
+            }
+
+            // İMLEÇ HAREKETİ: İmleç, kafa hareketine anında tepki verir (Hızlı kayar)
+            leftCursor.style.transform = `translate(calc(-50% + ${deltaY}px), calc(-50% + ${deltaX}px))`;
+            rightCursor.style.transform = `translate(calc(-50% + ${deltaY}px), calc(-50% + ${deltaX}px))`;
+
+            // KÜPLERİN HAREKETİ (YUMUŞAK TAKİP): Küpler de imlecin gittiği yöne doğru yavaşça süzülür.
+            // Böylece küpler ekranın dışına kaçamaz, hep ortada toplanmaya çalışır.
+            const worldTransform = `translate(${deltaY * 0.7}px, ${deltaX * 0.7}px)`;
+            worldLeft.style.transform = worldTransform;
+            worldRight.style.transform = worldTransform;
         }
 
-        // İmleç tam ekranın ortasında sabit durduğu için, hangi kutunun ekranın ortasına denk geldiğini hesaplayan fonksiyon
         function checkGazeCollision() {
-            // Sadece sol göz ekranı üzerinden kontrol etmemiz yeterli (iki göz de simetrik)
             const optionBoxes = worldLeft.querySelectorAll('.option-box');
             let hitDetected = false;
 
-            // Ekranın tam ortasının koordinatları (Sol gözün merkezi)
-            const centerX = window.innerWidth / 4;
-            const centerY = window.innerHeight / 2;
+            // İmlecin o anki dinamik konumunu alıp kutularla çakışıp çakışmadığına bakıyoruz
+            const cursorRect = leftCursor.getBoundingClientRect();
+            const cx = cursorRect.left + (cursorRect.width / 2);
+            const cy = cursorRect.top + (cursorRect.height / 2);
 
             optionBoxes.forEach(box => {
                 const rect = box.getBoundingClientRect();
-                
-                // Eğer ekranın tam ortası bu kutunun sınırları içindeyse (Bakış isabet ettiyse)
-                if (centerX >= rect.left && centerX <= rect.right && centerY >= rect.top && centerY <= rect.bottom) {
+                if (cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom) {
                     hitDetected = true;
                     const index = box.getAttribute('data-index');
-
-                    if (!isFusing || currentTargetIndex !== index) {
-                        startFusing(index);
-                    }
+                    if (!isFusing || currentTargetIndex !== index) { startFusing(index); }
                 }
             });
 
-            // Eğer hiçbir kutuya bakılmıyorsa imleci sıfırla
-            if (!hitDetected && isFusing) {
-                cancelFusing();
-            }
+            if (!hitDetected && isFusing) { cancelFusing(); }
         }
 
         function startFusing(index) {
@@ -230,10 +213,9 @@
             leftCursor.classList.add('fusing');
             rightCursor.classList.add('fusing');
 
-            // 1 saniye (1000ms) boyunca bakış sürerse tetikle
             fuseTimer = setTimeout(() => {
                 const allMatches = document.querySelectorAll(`.option-box[data-index="${currentTargetIndex}"]`);
-                allMatches.forEach(b => b.style.backgroundColor = '#FFFFFF'); // İsabet eden kutuyu beyaza boya
+                allMatches.forEach(b => b.style.backgroundColor = '#FFFFFF');
                 cancelFusing();
             }, 1000);
         }
